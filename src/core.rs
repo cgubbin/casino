@@ -2,28 +2,39 @@ use ndarray::{Array1, ScalarOperand};
 use ndarray_linalg::{eig::EigVals, Lapack, Scalar, error::LinalgError};
 use ndarray_rand::{rand_distr::{Distribution, StandardNormal}, rand::Rng};
 use num_traits::{Float, ToPrimitive};
-use crate::{Result, stats::{EpochOutput, MonteCarloOutput, SummaryStatistics}, input::{Input, Samples, Uncertainties}};
+use tracing::{event, Level};
+use crate::{Result, stats::{EpochOutput, MonteCarloOutput, SummaryStatistics}, input::{Input, Samples, Uncertainties}, Model};
 
-struct Config<E> {
-    num_significant_digits: u8,
-    required_coverage_probability: E,
+pub struct Config<E> {
+    pub(crate) num_significant_digits: u8,
+    pub(crate) required_coverage_probability: E,
+}
+
+impl<E: Float> Default for Config<E> {
+    fn default() -> Self {
+        Self {
+            num_significant_digits: 3,
+            required_coverage_probability: E::from(0.95).unwrap(),
+        }
+    }
 }
 
 pub struct Problem<'a, E, R, F> {
-    inputs: Input<'a, E>,
+    pub(crate) inputs: Input<'a, E>,
     /// Max(1 / (100 - p), 10^4)
-    number_of_trials: usize,
-    config: Config<E>,
-    rng: &'a mut R,
-    model: F,
+    pub(crate) number_of_trials: usize,
+    pub(crate) config: Config<E>,
+    pub(crate) rng: &'a mut R,
+    pub(crate) model: F,
 }
 
 impl<'a, E, R: Rng, F> Problem<'a, E, R, F>
 where
     E: Float + Lapack + PartialOrd + Scalar<Real = E> + ScalarOperand + ToPrimitive,
     StandardNormal: Distribution<E>,
-    F: Fn(Array1<E>) -> ::std::result::Result<Array1<E>, Box<dyn ::std::error::Error>>,
+    F: Model<E>,
 {
+    #[tracing::instrument(skip_all)]
     pub fn run(&mut self) -> Result<SummaryStatistics<E>> {
         self.security_checks()?;
         let mut h = 1;
@@ -31,13 +42,14 @@ where
         let mut collated = MonteCarloOutput::new();
 
         while !collated.is_converged(self.config.num_significant_digits as i32)
-            || h < 3 {
+            || h < 4 { // We need to run at least two trials to have access to summary statistics
+            event!(Level::INFO, iter = h);
             let outputs = self.epoch()?;
             collated.add_vals(outputs)?;
             h += 1;
         }
 
-        Ok(collated.summary_statistics()?)
+        collated.summary_statistics()
     }
 
     fn epoch(&mut self) -> Result<EpochOutput<E>> {
@@ -56,8 +68,8 @@ where
         self.inputs.generate_samples(self.number_of_trials, &mut self.rng)
     }
 
-    fn apply(&self, input: Array1<E>) -> Result<Array1<E>> {
-        (self.model)(input)
+    fn apply(&mut self, input: Array1<E>) -> Result<Array1<E>> {
+        self.model.apply(input)
     }
 
     fn security_checks(&self) -> Result<()> {

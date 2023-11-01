@@ -1,7 +1,5 @@
-use std::ops::Range;
-
 use crate::{Result, core::compute_tolerance};
-use ndarray::{Array1, Array2, Axis, ArrayView1, s, ScalarOperand, ShapeError, Array3};
+use ndarray::{Array1, Array2, Axis, ArrayView1, ScalarOperand, ShapeError};
 use ndarray_linalg::Scalar;
 use num_traits::{ToPrimitive, Float};
 
@@ -77,19 +75,24 @@ where
 
     pub(crate) fn is_converged(&self, num_significant_digits: i32) -> bool {
         let mean_expectation = self.mean_expectations();
-        let expectation_tolerance = mean_expectation.iter().map(|&y| compute_tolerance(y, num_significant_digits));
+        let expectation_tolerance = mean_expectation.iter().map(|&y| compute_tolerance(y, num_significant_digits)).collect::<Vec<_>>();
 
         let mean_std_dev = self.mean_std_dev();
-        let std_dev_tolerance = mean_std_dev.iter().map(|&y| compute_tolerance(y, num_significant_digits));
+        let std_dev_tolerance = mean_std_dev.iter().map(|&y| compute_tolerance(y, num_significant_digits)).collect::<Vec<_>>();
+
+        dbg!(&self.std_dev_std_devs());
+        dbg!(&std_dev_tolerance);
 
         self.std_dev_expectations().into_iter().zip(expectation_tolerance).all(|(val, tolerance)| Scalar::abs(val) < tolerance)
-            && self.std_dev_std_devs().into_iter().zip(std_dev_tolerance).all(|(val, tolerance)| Scalar::abs(val) < tolerance)
+           && self.std_dev_std_devs().into_iter().zip(std_dev_tolerance).all(|(val, tolerance)| Scalar::abs(val) < tolerance)
     }
 
     pub(crate) fn std_dev_expectations(&self) -> Array1<E> {
         (&self.expectation - self.mean_expectations())
+            .mapv(|x| Scalar::powi(x, 2))
             .sum_axis(Axis(0))
             .mapv(|x| x / E::from(self.h() * (self.h() - 1)).unwrap())
+            .mapv(|x| Scalar::sqrt(x))
     }
 
     pub(crate) fn mean_expectations(&self) -> Array1<E> {
@@ -98,14 +101,16 @@ where
     }
 
     pub(crate) fn std_dev_std_devs(&self) -> Array1<E> {
-        let std_dev =self.variance.mapv(|v| Scalar::sqrt(v));
+        let std_dev = self.variance.mapv(|v| Scalar::sqrt(v));
         (&std_dev - self.mean_std_dev())
+            .mapv(|x| Scalar::powi(x, 2))
             .sum_axis(Axis(0))
             .mapv(|x| x / E::from(self.h() * (self.h() - 1)).unwrap())
+            .mapv(|x| Scalar::sqrt(x))
     }
 
     pub(crate) fn mean_std_dev(&self) -> Array1<E> {
-        self.expectation
+        self.variance
             .mapv(|v| Scalar::sqrt(v))
             .sum_axis(Axis(0))
             .mapv(|x| x / E::from(self.h()).unwrap())
@@ -127,7 +132,7 @@ where
 
     fn expectation(&self) -> Array1<E> {
         self.full_output.sum_axis(Axis(0))
-            .mapv(|sum| sum / E::from(self.num_samples()).unwrap())
+            .mapv(|sum| sum / E::from(self.full_output.dim().0).unwrap())
     }
 
     fn covariance(&self, expectation: ArrayView1<'_, E>) -> Result<Array2<E>> {
@@ -138,7 +143,7 @@ where
 
         let mat = f - outer;
 
-        let cov = mat.dot(&mat.t()).mapv(|x| x / E::from(self.num_samples() - 1).unwrap());
+        let cov = mat.dot(&mat.t()).mapv(|x| x / E::from(self.full_output.dim().0 - 1).unwrap());
 
         Ok(cov)
     }
