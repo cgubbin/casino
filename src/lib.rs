@@ -4,7 +4,7 @@
 //! an array of values, which are the inputs to the measurement model, and converts
 //! them to an array of outputs.
 //!
-//! Calculations are run using using the [`Problem`] type. The following creates a simple
+//! Calculations are run using using the [`crate::Problem`] type. The following creates a simple
 //! measurement model in which the outputs relate to the inputs via a quadratic equation:
 //! ```
 //! use casino::{Builder, Model};
@@ -66,3 +66,4 @@ pub trait Model<E> {
 }
 
 pub use builder::Builder;
+pub use core::Problem;
