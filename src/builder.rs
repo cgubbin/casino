@@ -28,7 +28,7 @@
 //!
 //! let config = Config {
 //!     num_significant_digits: 3,
-//!     required_coverage_probability: 95,
+//!     required_coverage_probability: 0.95,
 //! };
 //!
 //! let mut problem = Builder::new(&mut rng, model)
