@@ -45,7 +45,7 @@
 #![warn(clippy::nursery)]
 
 use ndarray::Array1;
-use ndarray_rand::rand::Rng;
+
 
 mod builder;
 mod core;

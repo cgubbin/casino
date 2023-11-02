@@ -9,7 +9,7 @@ use ndarray_rand::{
     RandomExt,
 };
 
-pub(crate) enum Uncertainties<'a, E> {
+pub enum Uncertainties<'a, E> {
     // Diagional uncertainties representing the variance of each input variable
     Diagonal(ArrayView1<'a, E>),
     // Full uncertainties, whose diagonal elements represent the input variances and whose
@@ -17,12 +17,12 @@ pub(crate) enum Uncertainties<'a, E> {
     Full(ArrayView2<'a, E>),
 }
 
-pub(crate) struct Input<'a, E> {
+pub struct Input<'a, E> {
     pub(crate) expectation_values: ArrayView1<'a, E>,
     pub(crate) uncertainties: Uncertainties<'a, E>,
 }
 
-pub(crate) struct Samples<E> {
+pub struct Samples<E> {
     samples: Array2<E>,
 }
 
@@ -77,7 +77,7 @@ where
         rng: &mut R,
     ) -> Samples<E> {
         let mut samples = Samples::new(number_of_samples, self.num_inputs(), rng);
-        let std_dev = variance.mapv(|variance| variance.sqrt());
+        let std_dev = variance.mapv(ndarray_linalg::Scalar::sqrt);
 
         for mut row in samples.rows_mut() {
             row.assign(&(self.expectation_values.to_owned() + std_dev.clone() * row.to_owned()));

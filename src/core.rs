@@ -48,7 +48,7 @@ where
 
         let mut collated = MonteCarloOutput::new();
 
-        while !collated.is_converged(self.config.num_significant_digits as i32) || h < 4 {
+        while !collated.is_converged(i32::from(self.config.num_significant_digits)) || h < 4 {
             // We need to run at least two trials to have access to summary statistics
             event!(Level::INFO, iter = h);
             let outputs = self.epoch()?;
@@ -110,7 +110,7 @@ fn base_10_decompose<E: Float + ToPrimitive>(value: E) -> (E, i32, E) {
     (mantissa, base_10_exponent, sign)
 }
 
-pub(crate) fn compute_tolerance<E: Float + ToPrimitive>(
+pub fn compute_tolerance<E: Float + ToPrimitive>(
     value: E,
     num_significant_digits: i32,
 ) -> E {

@@ -3,11 +3,11 @@ use ndarray::{Array1, Array2, ArrayView1, Axis, ScalarOperand, ShapeError};
 use ndarray_linalg::Scalar;
 use num_traits::{Float, ToPrimitive};
 
-pub(crate) struct EpochOutput<E> {
+pub struct EpochOutput<E> {
     output: Array2<E>,
 }
 
-pub(crate) struct MonteCarloOutput<E> {
+pub struct MonteCarloOutput<E> {
     full_output: Array2<E>,
     expectation: Array2<E>,
     variance: Array2<E>,

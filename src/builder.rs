@@ -147,25 +147,17 @@ mod test {
         let mut rng = Isaac64Rng::seed_from_u64(state);
         struct TestModel {
             means: [f64; 2],
-            var: [f64; 2],
         }
 
-        impl Model<f64, Isaac64Rng> for TestModel {
+        impl Model<f64> for TestModel {
             fn apply(
                 &self,
                 inputs: ndarray::Array1<f64>,
-                rng: &mut Isaac64Rng,
             ) -> std::result::Result<ndarray::Array1<f64>, Box<dyn std::error::Error>> {
-                let dists = self
-                    .means
-                    .iter()
-                    .zip(self.var)
-                    .map(|(&mean, var)| Normal::new(mean, var.sqrt()))
-                    .collect::<Result<Vec<_>, _>>()?;
 
                 let res = inputs
                     .into_iter()
-                    .map(|input| dists[0].sample(rng) + input * dists[1].sample(rng))
+                    .map(|input| self.means[0] + input * self.means[1])
                     .collect();
 
                 Ok(res)
@@ -173,9 +165,8 @@ mod test {
         }
 
         let means = [rng.gen(), rng.gen()];
-        let var = [means[0] / 100.0, means[1] / 100.0];
 
-        let model = TestModel { means, var };
+        let model = TestModel { means };
 
         let num_data_points = 5;
 
