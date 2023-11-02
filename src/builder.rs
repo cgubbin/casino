@@ -78,7 +78,8 @@ impl<'a, E, R, M> Builder<'a, E, R, M, Unset, Unset, Unset> {
 }
 
 impl<'a, E, R, M, Ex, Va, Co> Builder<'a, E, R, M, Ex, Va, Co> {
-    fn with_config(mut self, config: Config<E>) -> Self {
+    #[must_use]
+    pub fn with_config(mut self, config: Config<E>) -> Self {
         self.config = Some(config);
         self
     }
