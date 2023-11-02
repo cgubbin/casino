@@ -1,3 +1,5 @@
+//! Methods to generate random samples from their known distributions.
+
 use ndarray::{
     iter::{Lanes, LanesMut},
     Array2, ArrayView1, ArrayView2, Dim, ScalarOperand,

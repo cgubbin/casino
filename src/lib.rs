@@ -46,7 +46,6 @@
 
 use ndarray::Array1;
 
-
 mod builder;
 mod core;
 mod input;
@@ -56,6 +55,10 @@ mod stats;
 pub type Result<T> = ::std::result::Result<T, Box<dyn ::std::error::Error>>;
 
 pub trait Model<E> {
+    /// The measurement model, which converts inputs to outputs.
+    ///
+    /// # Errors
+    /// - Internal error in the domain specific code.
     fn apply(
         &self,
         inputs: Array1<E>,

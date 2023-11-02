@@ -1,3 +1,43 @@
+//! Builder methods for creation of problems.
+//!
+//! A simple model can be created as follows:
+//! ```
+//! use casino::{Builder, Model};
+//! use ndarray::Array1;
+//! use ndarray_rand::rand::{Rng, SeedableRng};
+//! use rand_isaac::Isaac64Rng;
+//!
+//! struct Example {
+//!     a: f64,
+//!     b: f64,
+//! }
+//!
+//! impl Model<f64> for Example {
+//!     fn apply(&self, inputs: Array1<f64>) -> Result<Array1<f64>, Box<dyn ::std::error::Error>> {
+//!         Ok(inputs.mapv(|x| self.a + x.powi(2) * self.b))
+//!     }
+//! }
+//!
+//! let model = Example { a: 1.0, b: 2.0 };
+//!
+//! let state = 40;
+//! let mut rng = Isaac64Rng::seed_from_u64(state);
+//!
+//! let expectations = Array1::linspace(0., 10., 11);
+//! let variances = expectations.iter().map(|mean| mean / 100.0).collect::<Array1<_>>();
+//!
+//! let config = Config {
+//!     num_significant_digits: 3,
+//!     required_coverage_probability: 95,
+//! };
+//!
+//! let mut problem = Builder::new(&mut rng, model)
+//!                 .with_config(config)
+//!                 .with_input_expectations(expectations.view())
+//!                 .with_input_variances(variances.view())
+//!                 .build();
+//! ```
+
 use std::marker::PhantomData;
 
 use ndarray::{ArrayView1, ArrayView2};
@@ -12,6 +52,7 @@ use crate::{
 pub struct Set {}
 pub struct Unset {}
 
+/// Builder struct for creating and configuring problems
 pub struct Builder<'a, E, R, M, Ex, Va, Co> {
     config: Option<Config<E>>,
     rng: &'a mut R,
@@ -95,6 +136,10 @@ impl<'a, E, R, M, Ex> Builder<'a, E, R, M, Ex, Unset, Unset> {
 }
 
 impl<'a, E: Float + ToPrimitive, R: Rng, P> Builder<'a, E, R, P, Set, Set, Unset> {
+    /// Build a problem
+    ///
+    /// # Panics
+    /// - If the required coverage probability is not an integer.
     pub fn build(self) -> Problem<'a, E, R, P> {
         let config = self.config.unwrap_or_default();
         let number_of_trials =
@@ -135,16 +180,11 @@ mod test {
     use crate::{builder::Builder, core::compute_tolerance, Model};
 
     use ndarray::Array1;
-    use ndarray_rand::{
-        rand::{Rng, SeedableRng},
-        rand_distr::{Distribution, Normal},
-    };
+    use ndarray_rand::rand::{Rng, SeedableRng};
     use rand_isaac::Isaac64Rng;
 
     #[test]
     fn linear_model_has_expected_properties() {
-        let state = 40;
-        let mut rng = Isaac64Rng::seed_from_u64(state);
         struct TestModel {
             means: [f64; 2],
         }
@@ -154,15 +194,17 @@ mod test {
                 &self,
                 inputs: ndarray::Array1<f64>,
             ) -> std::result::Result<ndarray::Array1<f64>, Box<dyn std::error::Error>> {
-
                 let res = inputs
                     .into_iter()
-                    .map(|input| self.means[0] + input * self.means[1])
+                    .map(|input| input.mul_add(self.means[1], self.means[0]))
                     .collect();
 
                 Ok(res)
             }
         }
+
+        let state = 40;
+        let mut rng = Isaac64Rng::seed_from_u64(state);
 
         let means = [rng.gen(), rng.gen()];
 
@@ -185,10 +227,10 @@ mod test {
 
         let result = problem.run().unwrap();
 
-        let num_significant_digits = problem.config.num_significant_digits as i32;
+        let num_significant_digits = i32::from(problem.config.num_significant_digits);
 
         for (calc, input) in result.expectation.into_iter().zip(expectation_values) {
-            let exp = means[0] + input * means[1];
+            let exp = input.mul_add(means[1], means[0]);
             let tolerance = compute_tolerance(exp, num_significant_digits);
             println!("{tolerance}, {calc}, {exp}, {}", (calc - exp).abs());
             assert!((calc - exp).abs() < tolerance);

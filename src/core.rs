@@ -1,3 +1,4 @@
+//! Core Monte Carlo algorithm.
 use crate::{
     input::{Input, Samples, Uncertainties},
     stats::{EpochOutput, MonteCarloOutput, SummaryStatistics},
@@ -42,6 +43,7 @@ where
     F: Model<E>,
 {
     #[tracing::instrument(skip_all)]
+    /// The core algorithm.
     pub fn run(&mut self) -> Result<SummaryStatistics<E>> {
         self.security_checks()?;
         let mut h = 1;
@@ -52,7 +54,7 @@ where
             // We need to run at least two trials to have access to summary statistics
             event!(Level::INFO, iter = h);
             let outputs = self.epoch()?;
-            collated.add_vals(outputs)?;
+            collated.add_vals(&outputs)?;
             h += 1;
         }
 
@@ -65,7 +67,7 @@ where
 
         for sample in input_samples.samples() {
             let output = self.apply(sample.to_owned())?;
-            outputs.add_row(output)?;
+            outputs.add_row(output.view())?;
         }
 
         Ok(outputs)
@@ -110,10 +112,7 @@ fn base_10_decompose<E: Float + ToPrimitive>(value: E) -> (E, i32, E) {
     (mantissa, base_10_exponent, sign)
 }
 
-pub fn compute_tolerance<E: Float + ToPrimitive>(
-    value: E,
-    num_significant_digits: i32,
-) -> E {
+pub fn compute_tolerance<E: Float + ToPrimitive>(value: E, num_significant_digits: i32) -> E {
     let (_, base_10_exponent, _) = base_10_decompose(value);
     let l = base_10_exponent - num_significant_digits + 1;
     E::from(10f64).unwrap().powi(l) / (E::one() + E::one())
@@ -130,7 +129,7 @@ mod test {
         let state = 40;
         let mut rng = Isaac64Rng::seed_from_u64(state);
 
-        let exponent: i32 = rng.gen::<i8>() as i32;
+        let exponent: i32 = i32::from(rng.gen::<i8>());
         let mantissa: f64 = rng.gen_range(-10f64..10f64);
 
         let number = mantissa * 10f64.powi(exponent);
@@ -146,7 +145,7 @@ mod test {
         let state = 40;
         let mut rng = Isaac64Rng::seed_from_u64(state);
 
-        let exponent: i32 = rng.gen::<i8>() as i32;
+        let exponent: i32 = i32::from(rng.gen::<i8>());
         let mantissa: f64 = rng.gen_range(-10f64..10f64);
 
         let num_significant_digits = 2;
