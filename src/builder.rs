@@ -143,8 +143,11 @@ impl<'a, E: Float + ToPrimitive, R: Rng, P> Builder<'a, E, R, P, Set, Set, Unset
     /// - If the required coverage probability is not an integer.
     pub fn build(self) -> Problem<'a, E, R, P> {
         let config = self.config.unwrap_or_default();
-        let number_of_trials =
-            10_000.max(1 / (1 - (E::from(100).unwrap() * config.required_coverage_probability).to_usize().unwrap()));
+        let number_of_trials = 10_000.max(
+            (E::one() / (E::one() - config.required_coverage_probability))
+                .to_usize()
+                .unwrap(),
+        );
         Problem {
             config,
             number_of_trials,
