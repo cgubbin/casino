@@ -2,7 +2,7 @@
 //!
 //! A simple model can be created as follows:
 //! ```
-//! use casino::{Builder, Model};
+//! use casino::{Builder, Config, Model};
 //! use ndarray::Array1;
 //! use ndarray_rand::rand::{Rng, SeedableRng};
 //! use rand_isaac::Isaac64Rng;
@@ -144,7 +144,7 @@ impl<'a, E: Float + ToPrimitive, R: Rng, P> Builder<'a, E, R, P, Set, Set, Unset
     pub fn build(self) -> Problem<'a, E, R, P> {
         let config = self.config.unwrap_or_default();
         let number_of_trials =
-            10_000.max(1 / (1 - 100 * config.required_coverage_probability.to_usize().unwrap()));
+            10_000.max(1 / (1 - (E::from(100).unwrap() * config.required_coverage_probability).to_usize().unwrap()));
         Problem {
             config,
             number_of_trials,

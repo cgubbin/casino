@@ -66,4 +66,4 @@ pub trait Model<E> {
 }
 
 pub use builder::Builder;
-pub use core::Problem;
+pub use core::{Config, Problem};

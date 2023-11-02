@@ -14,8 +14,10 @@ use num_traits::{Float, ToPrimitive};
 use tracing::{event, Level};
 
 pub struct Config<E> {
-    pub(crate) num_significant_digits: u8,
-    pub(crate) required_coverage_probability: E,
+    /// Number of significant digits at convergence
+    pub num_significant_digits: u8,
+    /// Required coverage probability
+    pub required_coverage_probability: E,
 }
 
 impl<E: Float> Default for Config<E> {
