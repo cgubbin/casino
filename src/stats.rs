@@ -1,12 +1,11 @@
-use crate::{Result, core::compute_tolerance};
-use ndarray::{Array1, Array2, Axis, ArrayView1, ScalarOperand, ShapeError};
+use crate::{core::compute_tolerance, Result};
+use ndarray::{Array1, Array2, ArrayView1, Axis, ScalarOperand, ShapeError};
 use ndarray_linalg::Scalar;
-use num_traits::{ToPrimitive, Float};
+use num_traits::{Float, ToPrimitive};
 
 pub(crate) struct EpochOutput<E> {
     output: Array2<E>,
 }
-
 
 pub(crate) struct MonteCarloOutput<E> {
     full_output: Array2<E>,
@@ -42,11 +41,11 @@ where
         }
     }
 
-    pub(crate) fn add_vals(&mut self, vals: EpochOutput<E>) -> Result<()>{
+    pub(crate) fn add_vals(&mut self, vals: EpochOutput<E>) -> Result<()> {
         match self.full_output.dim() {
             (0, 0) => {
                 self.full_output = vals.output.clone();
-            },
+            }
             _ => {
                 for row in vals.output.rows() {
                     self.full_output.push_row(row.view())?;
@@ -56,13 +55,19 @@ where
         let stats = vals.summary_statistics()?;
         match self.expectation.dim() {
             (0, 0) => {
-                self.expectation = Array2::from_shape_vec((1, stats.expectation.len()), stats.expectation.to_vec())?;
+                self.expectation = Array2::from_shape_vec(
+                    (1, stats.expectation.len()),
+                    stats.expectation.to_vec(),
+                )?;
             }
             _ => self.expectation.push_row(stats.expectation.view())?,
         }
         match self.variance.dim() {
             (0, 0) => {
-                self.variance = Array2::from_shape_vec((1, stats.covariance.dim().0), stats.covariance.diag().to_vec())?;
+                self.variance = Array2::from_shape_vec(
+                    (1, stats.covariance.dim().0),
+                    stats.covariance.diag().to_vec(),
+                )?;
             }
             _ => self.variance.push_row(stats.covariance.diag())?,
         }
@@ -75,16 +80,29 @@ where
 
     pub(crate) fn is_converged(&self, num_significant_digits: i32) -> bool {
         let mean_expectation = self.mean_expectations();
-        let expectation_tolerance = mean_expectation.iter().map(|&y| compute_tolerance(y, num_significant_digits)).collect::<Vec<_>>();
+        let expectation_tolerance = mean_expectation
+            .iter()
+            .map(|&y| compute_tolerance(y, num_significant_digits))
+            .collect::<Vec<_>>();
 
         let mean_std_dev = self.mean_std_dev();
-        let std_dev_tolerance = mean_std_dev.iter().map(|&y| compute_tolerance(y, num_significant_digits)).collect::<Vec<_>>();
+        let std_dev_tolerance = mean_std_dev
+            .iter()
+            .map(|&y| compute_tolerance(y, num_significant_digits))
+            .collect::<Vec<_>>();
 
         dbg!(&self.std_dev_std_devs());
         dbg!(&std_dev_tolerance);
 
-        self.std_dev_expectations().into_iter().zip(expectation_tolerance).all(|(val, tolerance)| Scalar::abs(val) < tolerance)
-           && self.std_dev_std_devs().into_iter().zip(std_dev_tolerance).all(|(val, tolerance)| Scalar::abs(val) < tolerance)
+        self.std_dev_expectations()
+            .into_iter()
+            .zip(expectation_tolerance)
+            .all(|(val, tolerance)| Scalar::abs(val) < tolerance)
+            && self
+                .std_dev_std_devs()
+                .into_iter()
+                .zip(std_dev_tolerance)
+                .all(|(val, tolerance)| Scalar::abs(val) < tolerance)
     }
 
     pub(crate) fn std_dev_expectations(&self) -> Array1<E> {
@@ -96,7 +114,8 @@ where
     }
 
     pub(crate) fn mean_expectations(&self) -> Array1<E> {
-        self.expectation.sum_axis(Axis(0))
+        self.expectation
+            .sum_axis(Axis(0))
             .mapv(|x| x / E::from(self.h()).unwrap())
     }
 
@@ -116,7 +135,7 @@ where
             .mapv(|x| x / E::from(self.h()).unwrap())
     }
 
-    pub(crate) fn summary_statistics(&self) -> Result<SummaryStatistics<E>>{
+    pub(crate) fn summary_statistics(&self) -> Result<SummaryStatistics<E>> {
         let expectation = self.expectation();
         let covariance = self.covariance(expectation.view())?;
 
@@ -131,7 +150,8 @@ where
     }
 
     fn expectation(&self) -> Array1<E> {
-        self.full_output.sum_axis(Axis(0))
+        self.full_output
+            .sum_axis(Axis(0))
             .mapv(|sum| sum / E::from(self.full_output.dim().0).unwrap())
     }
 
@@ -143,12 +163,12 @@ where
 
         let mat = f - outer;
 
-        let cov = mat.dot(&mat.t()).mapv(|x| x / E::from(self.full_output.dim().0 - 1).unwrap());
+        let cov = mat
+            .dot(&mat.t())
+            .mapv(|x| x / E::from(self.full_output.dim().0 - 1).unwrap());
 
         Ok(cov)
     }
-
-
 }
 
 impl<E> EpochOutput<E>
@@ -157,21 +177,21 @@ where
 {
     pub(crate) fn new() -> Self {
         Self {
-            output: Array2::zeros((0, 0))
+            output: Array2::zeros((0, 0)),
         }
     }
 
-    pub(crate) fn add_row(&mut self, row: Array1<E>) -> ::std::result::Result<(), ShapeError>{
+    pub(crate) fn add_row(&mut self, row: Array1<E>) -> ::std::result::Result<(), ShapeError> {
         match self.output.dim() {
             (0, 0) => {
                 self.output = Array2::from_shape_vec((1, row.len()), row.to_vec())?;
                 Ok(())
-            },
+            }
             _ => self.output.push_row(row.view()),
         }
     }
 
-    pub(crate) fn summary_statistics(&self) -> Result<SummaryStatistics<E>>{
+    pub(crate) fn summary_statistics(&self) -> Result<SummaryStatistics<E>> {
         let expectation = self.expectation();
         let covariance = self.covariance(expectation.view())?;
 
@@ -182,7 +202,8 @@ where
     }
 
     fn expectation(&self) -> Array1<E> {
-        self.output.sum_axis(Axis(0))
+        self.output
+            .sum_axis(Axis(0))
             .mapv(|sum| sum / E::from(self.num_samples()).unwrap())
     }
 
@@ -194,7 +215,9 @@ where
 
         let mat = f - outer;
 
-        let cov = mat.dot(&mat.t()).mapv(|x| x / E::from(self.num_samples() - 1).unwrap());
+        let cov = mat
+            .dot(&mat.t())
+            .mapv(|x| x / E::from(self.num_samples() - 1).unwrap());
 
         Ok(cov)
     }
@@ -207,7 +230,10 @@ where
 #[cfg(test)]
 mod test {
     use ndarray::s;
-    use ndarray_rand::{rand::{Rng, SeedableRng}, rand_distr::{StandardNormal, Distribution, Normal}};
+    use ndarray_rand::{
+        rand::{Rng, SeedableRng},
+        rand_distr::{Distribution, Normal, StandardNormal},
+    };
     use rand_isaac::Isaac64Rng;
 
     use crate::stats::EpochOutput;
@@ -231,7 +257,8 @@ mod test {
         let stats = epochdata.summary_statistics().unwrap();
 
         for (ii, computed) in stats.expectation.into_iter().enumerate() {
-            let expected = epochdata.output.slice(s![.., ii]).sum() / epochdata.num_samples() as f64;
+            let expected =
+                epochdata.output.slice(s![.., ii]).sum() / epochdata.num_samples() as f64;
             approx::assert_relative_eq!(computed, expected);
         }
     }
@@ -285,6 +312,4 @@ mod test {
             approx::assert_relative_eq!(computed, std_dev, max_relative = 1e-2);
         }
     }
-
-
 }

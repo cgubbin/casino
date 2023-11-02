@@ -1,9 +1,16 @@
+use crate::{
+    input::{Input, Samples, Uncertainties},
+    stats::{EpochOutput, MonteCarloOutput, SummaryStatistics},
+    Model, Result,
+};
 use ndarray::{Array1, ScalarOperand};
-use ndarray_linalg::{eig::EigVals, Lapack, Scalar, error::LinalgError};
-use ndarray_rand::{rand_distr::{Distribution, StandardNormal}, rand::Rng};
+use ndarray_linalg::{eig::EigVals, error::LinalgError, Lapack, Scalar};
+use ndarray_rand::{
+    rand::Rng,
+    rand_distr::{Distribution, StandardNormal},
+};
 use num_traits::{Float, ToPrimitive};
 use tracing::{event, Level};
-use crate::{Result, stats::{EpochOutput, MonteCarloOutput, SummaryStatistics}, input::{Input, Samples, Uncertainties}, Model};
 
 pub struct Config<E> {
     pub(crate) num_significant_digits: u8,
@@ -41,8 +48,8 @@ where
 
         let mut collated = MonteCarloOutput::new();
 
-        while !collated.is_converged(self.config.num_significant_digits as i32)
-            || h < 4 { // We need to run at least two trials to have access to summary statistics
+        while !collated.is_converged(self.config.num_significant_digits as i32) || h < 4 {
+            // We need to run at least two trials to have access to summary statistics
             event!(Level::INFO, iter = h);
             let outputs = self.epoch()?;
             collated.add_vals(outputs)?;
@@ -65,7 +72,8 @@ where
     }
 
     fn generate_samples(&mut self) -> ::std::result::Result<Samples<E>, LinalgError> {
-        self.inputs.generate_samples(self.number_of_trials, &mut self.rng)
+        self.inputs
+            .generate_samples(self.number_of_trials, &mut self.rng)
     }
 
     fn apply(&mut self, input: Array1<E>) -> Result<Array1<E>> {
@@ -77,7 +85,10 @@ where
         // Required according to the spectral theorem for matrices
         if let Uncertainties::Full(covariance) = self.inputs.uncertainties {
             let covariance_eigs = covariance.eigvals()?;
-            if covariance_eigs.into_iter().any(|eigenvalue| eigenvalue.re() < E::zero()) {
+            if covariance_eigs
+                .into_iter()
+                .any(|eigenvalue| eigenvalue.re() < E::zero())
+            {
                 return Err("covariance matrix provided is not positive definite".into());
             }
         }
@@ -88,15 +99,21 @@ where
 fn base_10_decompose<E: Float + ToPrimitive>(value: E) -> (E, i32, E) {
     let sign = value.signum();
     let value = value / sign;
-    let base_10_exponent = value.log10().floor().to_i32().expect("failed to fit exponent in i32");
+    let base_10_exponent = value
+        .log10()
+        .floor()
+        .to_i32()
+        .expect("failed to fit exponent in i32");
 
     let mantissa = value / E::from(10f64).unwrap().powi(base_10_exponent);
 
     (mantissa, base_10_exponent, sign)
 }
 
-
-pub(crate) fn compute_tolerance<E: Float + ToPrimitive>(value: E, num_significant_digits: i32) -> E {
+pub(crate) fn compute_tolerance<E: Float + ToPrimitive>(
+    value: E,
+    num_significant_digits: i32,
+) -> E {
     let (_, base_10_exponent, _) = base_10_decompose(value);
     let l = base_10_exponent - num_significant_digits + 1;
     E::from(10f64).unwrap().powi(l) / (E::one() + E::one())
@@ -105,8 +122,8 @@ pub(crate) fn compute_tolerance<E: Float + ToPrimitive>(value: E, num_significan
 #[cfg(test)]
 mod test {
     use super::{base_10_decompose, compute_tolerance};
-    use rand_isaac::Isaac64Rng;
     use ndarray_rand::rand::{Rng, SeedableRng};
+    use rand_isaac::Isaac64Rng;
 
     #[test]
     fn base_10_decomposition_is_correct() {
@@ -139,14 +156,6 @@ mod test {
 
         let expected = 0.5 * 10f64.powi(exponent - num_significant_digits + 1);
 
-
         approx::assert_relative_eq!(expected, computed);
     }
-
-
-
-
-
-
-
 }

@@ -1,6 +1,13 @@
-use ndarray::{ArrayView1, ArrayView2, Array2, ScalarOperand, iter::{LanesMut, Lanes}, Dim};
-use ndarray_linalg::{Scalar, Lapack, Cholesky, UPLO, error::LinalgError};
-use ndarray_rand::{rand::Rng, rand_distr::{StandardNormal, Distribution}, RandomExt};
+use ndarray::{
+    iter::{Lanes, LanesMut},
+    Array2, ArrayView1, ArrayView2, Dim, ScalarOperand,
+};
+use ndarray_linalg::{error::LinalgError, Cholesky, Lapack, Scalar, UPLO};
+use ndarray_rand::{
+    rand::Rng,
+    rand_distr::{Distribution, StandardNormal},
+    RandomExt,
+};
 
 pub(crate) enum Uncertainties<'a, E> {
     // Diagional uncertainties representing the variance of each input variable
@@ -9,8 +16,6 @@ pub(crate) enum Uncertainties<'a, E> {
     // off-diagonal elements contain co-variance correlations
     Full(ArrayView2<'a, E>),
 }
-
-
 
 pub(crate) struct Input<'a, E> {
     pub(crate) expectation_values: ArrayView1<'a, E>,
@@ -27,7 +32,7 @@ where
 {
     fn new<R: Rng>(num_samples: usize, num_inputs: usize, rng: &mut R) -> Self {
         Self {
-            samples: Array2::random_using((num_samples, num_inputs), StandardNormal, rng)
+            samples: Array2::random_using((num_samples, num_inputs), StandardNormal, rng),
         }
     }
 
@@ -45,10 +50,18 @@ where
     E: Lapack + Scalar<Real = E> + ScalarOperand,
     StandardNormal: Distribution<E>,
 {
-    pub(crate) fn generate_samples<R: Rng>(&self, number_of_samples: usize, rng: &mut R) -> Result<Samples<E>, LinalgError> {
+    pub(crate) fn generate_samples<R: Rng>(
+        &self,
+        number_of_samples: usize,
+        rng: &mut R,
+    ) -> Result<Samples<E>, LinalgError> {
         let samples = match self.uncertainties {
-            Uncertainties::Diagonal(variance) => self.generate_from_variance(variance, number_of_samples, rng),
-            Uncertainties::Full(covariance) => self.generate_from_covariance(covariance, number_of_samples, rng)?,
+            Uncertainties::Diagonal(variance) => {
+                self.generate_from_variance(variance, number_of_samples, rng)
+            }
+            Uncertainties::Full(covariance) => {
+                self.generate_from_covariance(covariance, number_of_samples, rng)?
+            }
         };
         Ok(samples)
     }
@@ -57,8 +70,12 @@ where
         self.expectation_values.len()
     }
 
-    fn generate_from_variance<R: Rng>(&self, variance: ArrayView1<'a, E>, number_of_samples: usize, rng: &mut R) -> Samples<E>
-    {
+    fn generate_from_variance<R: Rng>(
+        &self,
+        variance: ArrayView1<'a, E>,
+        number_of_samples: usize,
+        rng: &mut R,
+    ) -> Samples<E> {
         let mut samples = Samples::new(number_of_samples, self.num_inputs(), rng);
         let std_dev = variance.mapv(|variance| variance.sqrt());
 
@@ -69,8 +86,12 @@ where
         samples
     }
 
-    fn generate_from_covariance<R: Rng>(&self, covariance: ArrayView2<'a, E>, number_of_samples: usize, rng: &mut R) -> Result<Samples<E>, LinalgError>
-    {
+    fn generate_from_covariance<R: Rng>(
+        &self,
+        covariance: ArrayView2<'a, E>,
+        number_of_samples: usize,
+        rng: &mut R,
+    ) -> Result<Samples<E>, LinalgError> {
         let mut samples = Samples::new(number_of_samples, self.num_inputs(), rng);
         let chol = covariance.cholesky(UPLO::Lower)?;
 
