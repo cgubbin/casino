@@ -12,7 +12,7 @@ argmin = { version = "0.8.1", features = ["_ndarrayl"] }
 # blas-src = { version = "0.9", features = ["openblas"] }
 # openblas-src = { version = "0.10", features = ["cblas", "system"] }
 
-ndarray = "0.15.6"
+ndarray = "0.17.2"
 ndarray-linalg = { version = "0.16.0" }
 ndarray-rand = "0.14.0"
 num-traits = "0.2.17"
