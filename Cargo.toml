@@ -8,7 +8,7 @@ publish = ["sensorium-tl"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argmin = { version = "0.8.1", features = ["_ndarrayl"] }
+argmin = { version = "0.11.0", features = ["_ndarrayl"] }
 # blas-src = { version = "0.9", features = ["openblas"] }
 # openblas-src = { version = "0.10", features = ["cblas", "system"] }
 
