@@ -1,0 +1,4 @@
+[https://github.com/cgubbin/nix-templates/blob/main/templates/rust/.cargo/config.tomltoolchain]
+channel = "stable"
+components = ["cargo", "clippy", "rustfmt", "rust-src"]
+profile = "default"

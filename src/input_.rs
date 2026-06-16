@@ -82,7 +82,8 @@ where
         let std_dev = variance.mapv(ndarray_linalg::Scalar::sqrt);
 
         for mut row in samples.rows_mut() {
-            row.assign(&(self.expectation_values.to_owned() + std_dev.clone() * row.to_owned()));
+            let vals = row.to_owned().clone();
+            row.assign(&(self.expectation_values.to_owned() + std_dev.clone() * vals));
         }
 
         samples
@@ -98,7 +99,8 @@ where
         let chol = covariance.cholesky(UPLO::Lower)?;
 
         for mut row in samples.rows_mut() {
-            row.assign(&(self.expectation_values.to_owned() + chol.dot(&row)));
+            let vals = row.to_owned().clone();
+            row.assign(&(self.expectation_values.to_owned() + chol.dot(&vals)));
         }
 
         Ok(samples)

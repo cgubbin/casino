@@ -49,35 +49,62 @@ use crate::{
     input::{Input, Uncertainties},
 };
 
+#[derive(Debug, Clone)]
+pub enum BuilderError {
+    InvalidProbability(f64),
+    InvalidArrayShape {
+        expected: usize,
+        found: usize,
+        kind: &'static str,
+    },
+    ConversionFailure(&'static str),
+}
+
 pub struct Set {}
 pub struct Unset {}
 
 /// Builder struct for creating and configuring problems
-pub struct Builder<'a, E, R, M, Ex, Va, Co> {
-    config: Option<Config<E>>,
-    rng: &'a mut R,
+pub struct BuilderBase<'a, E, M> {
     model: M,
-    expectation_values: Option<ArrayView1<'a, E>>,
-    variances: Option<ArrayView1<'a, E>>,
-    covariances: Option<ArrayView2<'a, E>>,
-    typestate: PhantomData<(Ex, Va, Co)>,
+    config: Option<Config<E>>,
+    expectation_values: ArrayView1<'a, E>,
 }
 
-impl<'a, E, R, M> Builder<'a, E, R, M, Unset, Unset, Unset> {
-    pub fn new(rng: &'a mut R, model: M) -> Self {
+/// Builder struct for creating and configuring problems with variance
+pub struct BuilderVariance<'a, E, M> {
+    base: BuilderBase<'a, E, M>,
+    variances: ArrayView1<'a, E>,
+}
+
+/// Builder struct for creating and configuring problems with covariance
+pub struct BuilderCovariance<'a, E, M> {
+    base: BuilderBase<'a, E, M>,
+    covariances: ArrayView2<'a, E>,
+}
+
+fn compute_trials<E: Float + ToPrimitive>(p: E) -> Result<usize, BuilderError> {
+    if p < E::zero() || p < E::one() {
+        return Result::Error(BuilderError::InvalidProbability(p.to_f64().unwrap()));
+    }
+
+    let base = (E::one() / (E::one() - p))
+        .to_usize()
+        .unwrap_or_error(BuilderError::ConversionFailure("to usize"))?;
+
+    Ok(10_000.max(base))
+}
+
+impl<'a, E, M> BuilderBase<'a, E, M> {
+    pub fn new(model: M, expectation_values: ArrayView1<'a, E>) -> Self {
         Self {
-            rng,
             model,
             config: None,
-            expectation_values: None,
-            variances: None,
-            covariances: None,
-            typestate: PhantomData,
+            expectation_values,
         }
     }
 }
 
-impl<'a, E, R, M, Ex, Va, Co> Builder<'a, E, R, M, Ex, Va, Co> {
+impl<'a, E, M> BuilderBase<'a, E, M> {
     #[must_use]
     pub fn with_config(mut self, config: Config<E>) -> Self {
         self.config = Some(config);
@@ -85,97 +112,88 @@ impl<'a, E, R, M, Ex, Va, Co> Builder<'a, E, R, M, Ex, Va, Co> {
     }
 }
 
-impl<'a, E, R, M, Va, Co> Builder<'a, E, R, M, Unset, Va, Co> {
-    pub fn with_input_expectations(
+impl<'a, E, M> BuilderBase<'a, E, M> {
+    pub fn variances(
         self,
-        expectation_values: ArrayView1<'a, E>,
-    ) -> Builder<'_, E, R, M, Set, Va, Co> {
-        Builder {
-            rng: self.rng,
-            model: self.model,
-            config: self.config,
-            expectation_values: Some(expectation_values),
-            variances: self.variances,
-            covariances: self.covariances,
-            typestate: PhantomData,
+        v: ArrayView1<'a, E>,
+    ) -> Result<BuilderVariance<'a, E, M>, BuilderError> {
+        if v.shape != self.expectation_values.shape {
+            return Err(BuilderError::InvalidArrayShape {
+                expected: self.expectation_values.len(),
+                found: v.len(),
+                kind: "variances and expectation values must have equal length",
+            });
         }
+        Ok(BuilderVariance {
+            base: self,
+            variances: v,
+        })
+    }
+
+    pub fn covariances(
+        self,
+        c: ArrayView2<'a, E>,
+    ) -> Result<BuilderCovariance<'a, E, M>, BuilderError> {
+        if c.shape[0] != self.expectation_values.len() {
+            return Err(BuilderError::InvalidArrayShape {
+                expected: self.expectation_values.len(),
+                found: v.shape[0],
+                kind: "covariances matrix must have the same number of rows as expectation values",
+            });
+        }
+        if c.shape[1] != self.expectation_values.len() {
+            return Err(BuilderError::InvalidArrayShape {
+                expected: self.expectation_values.len(),
+                found: v.shape[1],
+                kind: "covariances matrix must have the same number of cols as expectation values",
+            });
+        }
+        Ok(BuilderCovariance {
+            base: self,
+            covariances: c,
+        })
     }
 }
 
-impl<'a, E, R, M, Ex> Builder<'a, E, R, M, Ex, Unset, Unset> {
-    pub fn with_input_variances(
-        self,
-        variances: ArrayView1<'a, E>,
-    ) -> Builder<'_, E, R, M, Ex, Set, Unset> {
-        Builder {
-            rng: self.rng,
-            model: self.model,
-            config: self.config,
-            expectation_values: self.expectation_values,
-            variances: Some(variances),
-            covariances: self.covariances,
-            typestate: PhantomData,
-        }
-    }
-}
-
-impl<'a, E, R, M, Ex> Builder<'a, E, R, M, Ex, Unset, Unset> {
-    fn with_input_covariances(
-        self,
-        covariances: ArrayView2<'a, E>,
-    ) -> Builder<'_, E, R, M, Ex, Unset, Set> {
-        Builder {
-            rng: self.rng,
-            model: self.model,
-            config: self.config,
-            expectation_values: self.expectation_values,
-            variances: self.variances,
-            covariances: Some(covariances),
-            typestate: PhantomData,
-        }
-    }
-}
-
-impl<'a, E: Float + ToPrimitive, R: Rng, P> Builder<'a, E, R, P, Set, Set, Unset> {
+impl<'a, E: Float + ToPrimitive, P> BuilderVariance<'a, E, P> {
     /// Build a problem
     ///
     /// # Panics
     /// - If the required coverage probability is not an integer.
-    pub fn build(self) -> Problem<'a, E, R, P> {
-        let config = self.config.unwrap_or_default();
-        let number_of_trials = 10_000.max(
-            (E::one() / (E::one() - config.required_coverage_probability))
-                .to_usize()
-                .unwrap(),
-        );
-        Problem {
+    pub fn build<R: Rng>(self, rng: R) -> Result<Problem<'a, E, R, P>, BuilderError> {
+        let config = self.base.config.unwrap_or_default();
+
+        let number_of_trials = compute_trials(config.required_coverage_probability)?;
+
+        Ok(Problem {
             config,
             number_of_trials,
-            rng: self.rng,
-            model: self.model,
+            rng,
+            model: self.base.model,
             inputs: Input {
-                expectation_values: self.expectation_values.unwrap(),
-                uncertainties: Uncertainties::Diagonal(self.variances.unwrap()),
+                expectation_values: self.base.expectation_values,
+                uncertainties: Uncertainties::Diagonal(self.variances),
             },
-        }
+        })
     }
 }
 
-impl<'a, E: Float + ToPrimitive, R: Rng, P> Builder<'a, E, R, P, Set, Unset, Set> {
-    fn build(self) -> Problem<'a, E, R, P> {
-        let config = self.config.unwrap_or_default();
-        let number_of_trials =
-            10_000.max(1 / (1 - 100 * config.required_coverage_probability.to_usize().unwrap()));
-        Problem {
+impl<'a, E: Float + ToPrimitive, P> BuilderCovariance<'a, E, P> {
+    pub fn build<R: Rng>(self, rng: R) -> Result<Problem<'a, E, R, P>, BuilderError> {
+        let config = self.base.config.unwrap_or_default();
+
+        let number_of_trials = compute_trials(config.required_coverage_probability)?;
+
+        Ok(Problem {
             config,
             number_of_trials,
-            rng: self.rng,
-            model: self.model,
+            rng,
+            model: self.base.model,
             inputs: Input {
-                expectation_values: self.expectation_values.unwrap(),
-                uncertainties: Uncertainties::Full(self.covariances.unwrap()),
+                expectation_values: self.base.expectation_values,
+                uncertainties: Uncertainties::Full(self.covariances),
             },
-        }
+        })
     }
 }
 
