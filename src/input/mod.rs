@@ -7,9 +7,9 @@ use sampling::{
     GaussianSampler, GaussianSpace, LatinHypercubeSampler, ReferenceSpace, UnitCubeSpace,
 };
 
-pub(crate) use input::CompiledInput;
-pub(crate) use model::InputModel;
-pub(crate) use sampling::SamplingStrategy;
+pub use input::CompiledInput;
+pub use model::InputModel;
+pub use sampling::SamplingStrategy;
 
 pub use input::InputSpec;
 pub use sampling::SamplingMethod;

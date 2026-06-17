@@ -190,7 +190,7 @@ struct WeightedEvalResult<E, D> {
 /// - evaluates rows sequentially
 /// - stacks outputs into matrices
 /// - preserves validity structure
-/// - equivalent to calling apply_checked in row order
+/// - equivalent to calling `apply_checked` in row order
 ///
 /// Implementations MAY override `apply_batch` for performance.
 ///
@@ -204,7 +204,7 @@ struct WeightedEvalResult<E, D> {
 ///    - incorrect input shape
 ///    - incorrect output shape
 ///    - violated interface contract
-///    → handled via Result::Err
+///    → handled via `Result::Err`
 ///
 /// 2. Numerical or domain failure (soft failure)
 ///    - NaN results
@@ -212,7 +212,7 @@ struct WeightedEvalResult<E, D> {
 ///    - invalid physics domain
 ///    → handled via valid = FALSE
 ///
-/// TODO: Currently the dim_in, dim_out handling is quite frustrating. This could be encoded in the
+/// TODO: Currently the `dim_in`, `dim_out` handling is quite frustrating. This could be encoded in the
 /// type system `Operator<E, const IN: usize, const OUT: usize>`
 ///
 /// TODO: Batch execution loop is blocking, and the fill logic should be upgraded if
@@ -243,7 +243,7 @@ pub trait Operator<E> {
             valid.row_mut(ii).assign(&res.valid);
         }
 
-        Ok(EvalResult::try_from_parts(values, valid)?)
+        EvalResult::try_from_parts(values, valid)
     }
 
     fn apply_checked(
@@ -269,12 +269,12 @@ pub trait Operator<E> {
     }
 
     /// Implementations of `apply` MUST assume:
-    /// - input length == dim_in (already validated by apply_checked)
+    /// - input length == `dim_in` (already validated by `apply_checked`)
     ///
     /// They MUST guarantee:
-    /// - returned EvalResult has:
-    ///     - value.len() == dim_out
-    ///     - valid.len() == dim_out
+    /// - returned `EvalResult` has:
+    ///     - `value.len()` == `dim_out`
+    ///     - `valid.len()` == `dim_out`
     ///
     /// This should be enforced by constructing the `EvalResult` through the `try_from_parts`
     /// interface. It should not be possible for the caller to construct these in any other way.

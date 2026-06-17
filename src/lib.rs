@@ -160,8 +160,8 @@ pub struct MonteCarloOptions<E> {
 }
 
 impl MonteCarlo {
-    pub fn run<'a, E, O>(
-        input: InputSpec<'a, E>,
+    pub fn run<E, O>(
+        input: InputSpec<'_, E>,
         operator: O,
         sampling: SamplingMethod,
         options: MonteCarloOptions<E>,
@@ -181,9 +181,9 @@ impl MonteCarlo {
                 let compiled = input.compile_gaussian(options.seed)?;
                 let mut engine = MonteCarloEngine {
                     compiled,
+                    operator,
                     observer,
                     controller,
-                    operator,
                 };
                 engine.run(options.batch_size)
             }
@@ -191,9 +191,9 @@ impl MonteCarlo {
                 let compiled = input.compile_lhs(options.seed)?;
                 let mut engine = MonteCarloEngine {
                     compiled,
+                    operator,
                     observer,
                     controller,
-                    operator,
                 };
 
                 engine.run(options.batch_size)
@@ -254,7 +254,7 @@ where
             self.observer.update_batch(eval);
 
             if let StopDecision::Stop { reason } =
-                self.controller.should_stop(&self.observer.state())
+                self.controller.should_stop(self.observer.state())
             {
                 stop_reason.replace(reason);
                 break;

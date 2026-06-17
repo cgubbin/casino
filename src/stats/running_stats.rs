@@ -29,7 +29,7 @@ where
         }
     }
 
-    pub fn count(&self) -> usize {
+    pub const fn count(&self) -> usize {
         self.n
     }
 
@@ -157,7 +157,7 @@ where
     }
 
     pub fn std_dev(&self) -> Array1<E> {
-        self.covariance().diag().mapv(|v| v.sqrt())
+        self.covariance().diag().mapv(num_traits::Float::sqrt)
     }
 
     /// Standard error of the mean per component

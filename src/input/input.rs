@@ -12,7 +12,7 @@ pub type SampleMatrix<E> = Array2<E>;
 
 /// Input to the Monte Carlo simulation
 ///
-/// Input can be provided as a set of means and marginal_scales, which can be interpreted according to
+/// Input can be provided as a set of means and `marginal_scales`, which can be interpreted according to
 /// the chosen sampling model:
 /// - Gaussian -> Standard Deviation
 /// - Latin Hypercube -> Spread
@@ -43,7 +43,7 @@ where
     float: std::marker::PhantomData<E>,
 }
 
-impl<'a, E> InputSpec<'a, E> {
+impl<E> InputSpec<'_, E> {
     pub fn compile_gaussian(
         self,
         seed: u64,
