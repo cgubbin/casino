@@ -1,6 +1,5 @@
 use crate::controller::StopReason;
 use crate::stats::{StatisticalDiagnostics, SummaryStatistics};
-use ndarray::Array1;
 
 #[derive(Debug)]
 pub struct MonteCarloResult<E> {

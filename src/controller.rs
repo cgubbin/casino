@@ -1,7 +1,7 @@
 use ndarray::{Array1, LinalgScalar, ScalarOperand};
 use num_traits::{Float, FromPrimitive};
 
-use crate::stats::{RunningStats, SummaryStatistics};
+use crate::stats::RunningStats;
 
 pub enum StopDecision {
     Continue,
@@ -45,7 +45,7 @@ where
     }
 }
 
-pub(crate) trait McController<E> {
+pub trait McController<E> {
     fn should_stop(&self, stats: &RunningStats<E>) -> StopDecision;
 }
 

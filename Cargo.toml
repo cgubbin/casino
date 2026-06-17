@@ -23,4 +23,5 @@ tracing = "0.1.44"
 
 [dev-dependencies]
 approx = "0.5.1"
+cargo-husky = "1.5.0"
 

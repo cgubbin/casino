@@ -54,7 +54,7 @@
 ///     }
 /// }
 /// ```
-use ndarray::{Array, Array1, Array2, ArrayView1, ArrayView2, Dimension, Ix1, Ix2, Zip};
+use ndarray::{Array, Array2, ArrayView1, ArrayView2, Dimension, Ix1, Ix2, Zip};
 use num_traits::{Float, Zero};
 
 #[derive(thiserror::Error, Debug)]

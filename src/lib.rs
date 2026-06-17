@@ -118,7 +118,7 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 
-use ndarray::{Array1, LinalgScalar, ScalarOperand};
+use ndarray::{LinalgScalar, ScalarOperand};
 use ndarray_linalg::{Lapack, Scalar};
 use ndarray_rand::rand_distr::{Distribution, StandardNormal};
 use num_traits::{Float, FromPrimitive};
@@ -131,9 +131,9 @@ mod result;
 mod stats;
 
 use controller::{AdaptiveController, McController, StopDecision};
-use input::{CompiledInput, InputModel, SampleError, SamplingStrategy};
+use input::{CompiledInput, InputModel, SamplingStrategy};
 use observer::{McObserver, StatsObserver};
-use stats::{FinalStatistics, RunningStats, SampleBatch, SummaryStatistics};
+use stats::{FinalStatistics, RunningStats, SampleBatch};
 
 pub use controller::StopReason;
 pub use input::{InputSpec, SamplingMethod};
@@ -171,14 +171,14 @@ impl MonteCarlo {
         StandardNormal: Distribution<E>,
         O: Operator<E>,
     {
-        let mut observer = StatsObserver::new(operator.dim_out());
+        let observer = StatsObserver::new(operator.dim_out());
 
         let controller =
             AdaptiveController::new(options.min_samples, options.max_samples, options.rel_tol);
 
         match sampling {
             SamplingMethod::Gaussian => {
-                let mut compiled = input.compile_gaussian(options.seed)?;
+                let compiled = input.compile_gaussian(options.seed)?;
                 let mut engine = MonteCarloEngine {
                     compiled,
                     observer,
@@ -188,7 +188,7 @@ impl MonteCarlo {
                 engine.run(options.batch_size)
             }
             SamplingMethod::LatinHypercube => {
-                let mut compiled = input.compile_lhs(options.seed)?;
+                let compiled = input.compile_lhs(options.seed)?;
                 let mut engine = MonteCarloEngine {
                     compiled,
                     observer,
@@ -256,7 +256,7 @@ where
             if let StopDecision::Stop { reason } =
                 self.controller.should_stop(&self.observer.state())
             {
-                stop_reason = Some(reason);
+                stop_reason.replace(reason);
                 break;
             }
         }

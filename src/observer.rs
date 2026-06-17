@@ -1,7 +1,6 @@
 use ndarray::{Ix2, LinalgScalar, ScalarOperand};
 use num_traits::{Float, FromPrimitive};
 
-use crate::controller::StopReason;
 use crate::operator::EvalResult;
 use crate::stats::{FinalStatistics, RunningStats};
 

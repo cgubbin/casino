@@ -1,7 +1,7 @@
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, LinalgScalar, ScalarOperand};
 use num_traits::Float;
 
-use super::{FinalStatistics, SampleBatch, StatisticalDiagnostics, SummaryStatistics};
+use super::{FinalStatistics, StatisticalDiagnostics, SummaryStatistics};
 use crate::controller::{ConvergenceCriterion, ConvergenceStatus};
 
 #[derive(Clone, Debug)]
@@ -77,7 +77,7 @@ where
             }
 
             let delta_i = x[i] - old_mean[i];
-            let delta2_i = x[i] - self.mean[i];
+            let _delta2_i = x[i] - self.mean[i];
 
             for j in 0..dim {
                 if !valid[j] {
@@ -86,7 +86,7 @@ where
 
                 self.pair_count[[i, j]] += 1;
 
-                let delta_j = x[j] - old_mean[j];
+                let _delta_j = x[j] - old_mean[j];
                 let delta2_j = x[j] - self.mean[j];
 
                 // Multivariate Welford update

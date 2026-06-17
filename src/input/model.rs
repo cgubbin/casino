@@ -4,7 +4,7 @@ use num_traits::Float;
 
 use super::{GaussianSpace, ReferenceSpace, SampleError, UnitCubeSpace};
 
-pub(crate) trait InputModel<E> {
+pub trait InputModel<E> {
     type Space: ReferenceSpace;
 
     fn dim(&self) -> usize;
