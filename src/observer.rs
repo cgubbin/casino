@@ -1,8 +1,9 @@
 use ndarray::{Ix2, LinalgScalar, ScalarOperand};
 use num_traits::{Float, FromPrimitive};
 
+use crate::controller::StopReason;
 use crate::operator::EvalResult;
-use crate::stats::{RunningStats, SummaryStatistics};
+use crate::stats::{FinalStatistics, RunningStats};
 
 pub trait McObserver<E> {
     type State;
@@ -37,7 +38,7 @@ where
     E: Float + LinalgScalar + ScalarOperand + FromPrimitive + std::fmt::Debug,
 {
     type State = RunningStats<E>;
-    type Output = SummaryStatistics<E>;
+    type Output = FinalStatistics<E>;
 
     fn update_batch(&mut self, batch: EvalResult<E, Ix2>) {
         let (xs, valid) = batch.split();

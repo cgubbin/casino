@@ -113,9 +113,8 @@ where
         S::init(self.seed)
     }
 
-    pub fn sample(&self, state: &mut S::State, n: usize) -> Array2<E> {
-        let z = S::sample(state, n, self.model.dim());
-        self.model.apply(z)
+    pub fn sample(&self, state: &mut S::State, n: usize) -> SampleMatrix<E> {
+        S::sample(state, n, self.model.dim())
     }
 
     pub fn sample_stateless(&self, n: usize) -> SampleMatrix<E> {
@@ -127,6 +126,7 @@ where
 #[cfg(test)]
 mod test {
     use super::InputSpec;
+    use crate::input::model::InputModel;
     #[test]
     fn gaussian_sample_has_expected_shape() {
         use ndarray::array;
@@ -141,7 +141,8 @@ mod test {
         .compile_gaussian(42)
         .unwrap();
 
-        let samples = compiled.sample_stateless(500);
+        let z = compiled.sample_stateless(500);
+        let samples = compiled.model.apply(z);
 
         assert_eq!(samples.shape(), &[500, 3]);
     }
@@ -160,7 +161,8 @@ mod test {
 
         let compiled = input.compile_gaussian(42).unwrap();
 
-        let samples = compiled.sample_stateless(100_000);
+        let z = compiled.sample_stateless(100_000);
+        let samples = compiled.model.apply(z);
 
         let x = samples.column(0);
 
@@ -187,7 +189,8 @@ mod test {
 
         let compiled = input.compile_gaussian(42).unwrap();
 
-        let samples = compiled.sample_stateless(200_000);
+        let z = compiled.sample_stateless(200_000);
+        let samples = compiled.model.apply(z);
 
         let x = samples.column(0);
         let y = samples.column(1);
@@ -227,8 +230,11 @@ mod test {
         .compile_gaussian(123)
         .unwrap();
 
-        let sa = a.sample_stateless(10_000);
-        let sb = b.sample_stateless(10_000);
+        let za = a.sample_stateless(10_000);
+        let zb = b.sample_stateless(10_000);
+
+        let sa = a.model.apply(za);
+        let sb = b.model.apply(zb);
 
         assert_eq!(sa, sb);
     }
@@ -254,8 +260,11 @@ mod test {
         .compile_gaussian(2)
         .unwrap();
 
-        let sa = a.sample_stateless(100);
-        let sb = b.sample_stateless(100);
+        let za = a.sample_stateless(100);
+        let zb = b.sample_stateless(100);
+
+        let sa = a.model.apply(za);
+        let sb = b.model.apply(zb);
 
         assert_ne!(sa, sb);
     }
@@ -290,7 +299,8 @@ mod test {
         .compile_lhs(42)
         .unwrap();
 
-        let samples = compiled.sample_stateless(500);
+        let z = compiled.sample_stateless(500);
+        let samples = compiled.model.apply(z);
 
         assert_eq!(samples.shape(), &[500, 3]);
     }
@@ -428,7 +438,9 @@ mod test {
         .compile_gaussian(42)
         .unwrap();
 
-        let samples = compiled.sample_stateless(10_000);
+        let z = compiled.sample_stateless(10_000);
+
+        let samples = compiled.model.apply(z);
 
         assert!(samples.iter().all(|x| (*x - 5f64).abs() < 1e-12));
     }
@@ -457,8 +469,11 @@ mod test {
         .compile_gaussian(42)
         .unwrap();
 
-        let a = independent.sample_stateless(200_000);
-        let b = correlated.sample_stateless(200_000);
+        let za = independent.sample_stateless(200_000);
+        let zb = correlated.sample_stateless(200_000);
+
+        let a = independent.model.apply(za);
+        let b = correlated.model.apply(zb);
 
         for j in 0..3 {
             let mean_a = a.column(j).iter().copied().sum::<f64>() / a.nrows() as f64;
@@ -483,8 +498,11 @@ mod test {
         .compile_gaussian(42)
         .unwrap();
 
-        let a = compiled.sample_stateless(10_000);
-        let b = compiled.sample_stateless(10_000);
+        let za = compiled.sample_stateless(10_000);
+        let zb = compiled.sample_stateless(10_000);
+
+        let a = compiled.model.apply(za);
+        let b = compiled.model.apply(zb);
 
         assert_eq!(a, b);
     }

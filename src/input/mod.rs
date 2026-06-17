@@ -7,9 +7,12 @@ use sampling::{
     GaussianSampler, GaussianSpace, LatinHypercubeSampler, ReferenceSpace, UnitCubeSpace,
 };
 
-pub(crate) use input::{CompiledInput, InputSpec};
+pub(crate) use input::CompiledInput;
 pub(crate) use model::InputModel;
 pub(crate) use sampling::SamplingStrategy;
+
+pub use input::InputSpec;
+pub use sampling::SamplingMethod;
 
 #[derive(thiserror::Error, Debug)]
 pub enum SampleError {

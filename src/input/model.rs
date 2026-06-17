@@ -74,7 +74,8 @@ where
 
     fn apply(&self, z: Array2<E>) -> Array2<E> {
         let mu = self.mean.view().insert_axis(Axis(0));
-        z.dot(&self.transform) + &mu
+        let r = z.dot(&self.transform) + &mu;
+        r
     }
 }
 

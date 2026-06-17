@@ -1,15 +1,119 @@
-//! Casino is a library to carry out Monte-Carlo propagation of distributions.
+//! # Casino — Adaptive Monte Carlo Uncertainty Propagation
 //!
-//! Users need to implement the [`Model`] trait. This has a single method which takes
-//! an array of values, which are the inputs to the measurement model, and converts
-//! them to an array of outputs.
+//! Casino is a scientific Monte Carlo simulation framework for propagating uncertainty
+//! through deterministic or stochastic models.
 //!
-//! Calculations are run using using the [`crate::Problem`] type. The following creates a simple
-//! measurement model in which the outputs relate to the inputs via a quadratic equation:
+//! It is designed for *numerical reliability, reproducibility, and composability* in
+//! engineering and scientific computing.
 //!
-//! When the algorithm is run, the apply method is called repeatedly until convergence is achieved
-//! in the distributional properties of the output variables.
+//! ---
 //!
+//! ## Core Concept
+//!
+//! Casino decomposes Monte Carlo simulation into three independent components:
+//!
+//! ### 1. Input models (`InputSpec`)
+//! Define uncertain inputs as either:
+//! - Independent distributions (mean + dispersion)
+//! - Correlated Gaussian distributions (mean + covariance)
+//!
+//! ### 2. Sampling strategies (`SamplingStrategy`)
+//! Control how the input space is explored:
+//! - Standard Monte Carlo (Gaussian)
+//! - Latin Hypercube Sampling (LHS)
+//! - Low-discrepancy sequences (Sobol, planned)
+//!
+//! ### 3. Operators (`Operator`)
+//! User-defined models that map inputs → outputs while explicitly handling
+//! numerical failure via validity masks rather than panics or exceptions.
+//!
+//! ---
+//!
+//! ## Design Philosophy
+//!
+//! Casino is built around three principles:
+//!
+//! ### 1. No exceptions in Monte Carlo flow
+//! Numerical or domain failures are encoded via validity masks.
+//! Invalid samples remain in the dataset but are excluded from statistics.
+//!
+//! ### 2. Streaming statistics
+//! No full sample storage is required. Mean, covariance, and uncertainty
+//! estimates are computed incrementally using numerically stable algorithms.
+//!
+//! ### 3. Adaptive convergence
+//! Simulations terminate automatically when statistical uncertainty drops below
+//! a user-defined tolerance, or when sample limits are reached.
+//!
+//! ---
+//!
+//! ## Output
+//!
+//! The primary result of a simulation is:
+//!
+//! - `SummaryStatistics`
+//!   - expectation (mean)
+//!   - covariance
+//!
+//! - `StatisticalDiagnostics`
+//!   - standard errors
+//!   - validity rates
+//!   - convergence metadata
+//!
+//! - `StopReason`
+//!   - explains why the simulation terminated
+//!
+//! ---
+//!
+//! ## Example (simple Gaussian propagation)
+//!
+//! ```rust
+//! use casino::*;
+//! use ndarray::arr1;
+//!
+//! struct MyModel;
+//!
+//! impl Operator<f64> for MyModel {
+//!     fn dim_in(&self) -> usize { 2 }
+//!     fn dim_out(&self) -> usize { 1 }
+//!
+//!     fn apply(
+//!         &self,
+//!         x: ndarray::ArrayView1<'_, f64>,
+//!     ) -> Result<EvalResult<f64, ndarray::Ix1>, OperatorError> {
+//!         let y = x[0] * x[1];
+//!
+//!         EvalResult::try_from_parts(arr1(&[y]), arr1(&[true]))
+//!     }
+//! }
+//! ```
+//!
+//! ---
+//!
+//! ## Why Casino exists
+//!
+//! Traditional Monte Carlo frameworks often:
+//! - store all samples (memory heavy)
+//! - mix sampling and model logic
+//! - rely on exceptions for numerical failure
+//! - lack adaptive stopping criteria
+//!
+//! Casino explicitly separates these concerns to enable:
+//! - large-scale simulations
+//! - reproducible scientific workflows
+//! - safe handling of numerical instability
+//! - interchangeable sampling strategies
+//!
+//! ---
+//!
+//! ## Status
+//!
+//! This crate is actively evolving. Current focus areas:
+//! - Sobol sampling integration
+//! - parallel batch execution
+//! - improved convergence diagnostics
+//! - importance sampling extensions
+
 #![allow(dead_code)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
@@ -23,15 +127,18 @@ mod controller;
 mod input;
 mod observer;
 mod operator;
+mod result;
 mod stats;
 
-use controller::{AdaptiveController, McController};
-use input::{CompiledInput, InputModel, InputSpec, SampleError, SamplingStrategy};
+use controller::{AdaptiveController, McController, StopDecision};
+use input::{CompiledInput, InputModel, SampleError, SamplingStrategy};
 use observer::{McObserver, StatsObserver};
-use operator::Operator;
-use stats::{RunningStats, SampleBatch, SummaryStatistics};
+use stats::{FinalStatistics, RunningStats, SampleBatch, SummaryStatistics};
 
-pub use operator::{EvalResult, OperatorError};
+pub use controller::StopReason;
+pub use input::{InputSpec, SamplingMethod};
+pub use operator::{EvalResult, Operator, OperatorError};
+pub use result::MonteCarloResult;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CasinoError {
@@ -43,34 +150,55 @@ pub enum CasinoError {
 
 pub struct MonteCarlo;
 
+#[derive(Clone)]
+pub struct MonteCarloOptions<E> {
+    pub seed: u64,
+    pub batch_size: usize,
+    pub min_samples: usize,
+    pub max_samples: usize,
+    pub rel_tol: E,
+}
+
 impl MonteCarlo {
     pub fn run<'a, E, O>(
         input: InputSpec<'a, E>,
         operator: O,
-        seed: u64,
-        n_per_batch: usize,
-        min_samples: usize,
-        max_samples: usize,
-        rel_tol: E,
-    ) -> Result<SummaryStatistics<E>, CasinoError>
+        sampling: SamplingMethod,
+        options: MonteCarloOptions<E>,
+    ) -> Result<MonteCarloResult<E>, CasinoError>
     where
         E: Float + Scalar + From<f64> + Lapack + ScalarOperand,
         StandardNormal: Distribution<E>,
         O: Operator<E>,
     {
-        let mut compiled = input.compile_gaussian(seed)?;
         let mut observer = StatsObserver::new(operator.dim_out());
 
-        let controller = AdaptiveController::new(min_samples, max_samples, rel_tol);
+        let controller =
+            AdaptiveController::new(options.min_samples, options.max_samples, options.rel_tol);
 
-        let mut engine = MonteCarloEngine {
-            compiled,
-            observer,
-            controller,
-            operator,
-        };
+        match sampling {
+            SamplingMethod::Gaussian => {
+                let mut compiled = input.compile_gaussian(options.seed)?;
+                let mut engine = MonteCarloEngine {
+                    compiled,
+                    observer,
+                    controller,
+                    operator,
+                };
+                engine.run(options.batch_size)
+            }
+            SamplingMethod::LatinHypercube => {
+                let mut compiled = input.compile_lhs(options.seed)?;
+                let mut engine = MonteCarloEngine {
+                    compiled,
+                    observer,
+                    controller,
+                    operator,
+                };
 
-        engine.run(n_per_batch)
+                engine.run(options.batch_size)
+            }
+        }
     }
 }
 
@@ -91,18 +219,17 @@ where
     S: SamplingStrategy<E>,
     M: InputModel<E, Space = S::Space>,
     O: Operator<E>,
-    W: McObserver<E, State = RunningStats<E>>,
+    W: McObserver<E, State = RunningStats<E>, Output = FinalStatistics<E>>,
     C: McController<E>,
 {
-    // pub fn new(compiled: CompiledInput<E, S, M>, operator: O) -> Self {
-    //     Self { compiled, operator }
-    // }
-
-    pub fn run(&mut self, n_per_batch: usize) -> Result<W::Output, CasinoError>
+    pub fn run(&mut self, n_per_batch: usize) -> Result<MonteCarloResult<E>, CasinoError>
     where
         E: Float + LinalgScalar + ScalarOperand + FromPrimitive,
     {
         let mut state = self.compiled.init_state();
+
+        let mut stop_reason: Option<StopReason> = None;
+
         loop {
             // ------------------------------------------------------------
             // 1. sample latent space Z
@@ -126,48 +253,26 @@ where
             // ------------------------------------------------------------
             self.observer.update_batch(eval);
 
-            if self.controller.should_stop(&self.observer.state()) {
+            if let StopDecision::Stop { reason } =
+                self.controller.should_stop(&self.observer.state())
+            {
+                stop_reason = Some(reason);
                 break;
             }
         }
 
-        Ok(self.observer.finalize())
+        let total_samples = self.observer.state().count();
+        let final_statistics = self.observer.finalize();
+
+        Ok(MonteCarloResult {
+            statistics: final_statistics.summary,
+            diagnostics: final_statistics.diagnostics,
+            total_samples,
+            stop_reason: stop_reason.expect("can't break the loop without filling the option"),
+        })
     }
 }
-//     pub fn run_streaming(&self, n: usize, chunk: usize) -> Result<SummaryStatistics<E>, CasinoError>
-//     where
-//         E: Float + LinalgScalar + ScalarOperand + FromPrimitive,
-//     {
-//         let mut stats = RunningStats::new(self.operator.dim_out());
 
-//         let dim = self.compiled.model.dim();
-
-//         let mut remaining = n;
-
-//         let mut state = self.compiled.init_state();
-
-//         while remaining > 0 {
-//             let m = remaining.min(chunk);
-//             remaining -= m;
-
-//             let z = self.compiled.sample(&mut state, m);
-
-//             let samples = self.compiled.model.apply(z);
-
-//             let eval = self.operator.apply_batch(samples.view())?;
-
-//             let (value, valid) = eval.split();
-//             stats.update_batch(value.view(), valid.view());
-//         }
-
-//         Ok(SummaryStatistics {
-//             mean: stats.finalize_mean(),
-//             covariance: stats.covariance(),
-//         })
-//     }
-// }
-//
-//
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,11 +307,29 @@ mod tests {
 
         let seed = 12345;
 
-        let r1 = MonteCarlo::run(input.clone(), IdentityOp, seed, 128, 512, 512, 1e-3).unwrap();
-        let r2 = MonteCarlo::run(input, IdentityOp, seed, 128, 512, 512, 1e-3).unwrap();
+        let options = MonteCarloOptions {
+            seed: seed,
+            batch_size: 128,
+            min_samples: 512,
+            max_samples: 512,
+            rel_tol: 1e-3,
+        };
 
-        approx::assert_abs_diff_eq!(r1.mean, r2.mean, epsilon = 1e-12);
-        approx::assert_abs_diff_eq!(r1.covariance, r2.covariance, epsilon = 1e-12);
+        let r1 = MonteCarlo::run(
+            input.clone(),
+            IdentityOp,
+            SamplingMethod::Gaussian,
+            options.clone(),
+        )
+        .unwrap();
+        let r2 = MonteCarlo::run(input, IdentityOp, SamplingMethod::Gaussian, options).unwrap();
+
+        approx::assert_abs_diff_eq!(r1.statistics.mean, r2.statistics.mean, epsilon = 1e-12);
+        approx::assert_abs_diff_eq!(
+            r1.statistics.covariance,
+            r2.statistics.covariance,
+            epsilon = 1e-12
+        );
     }
 
     #[test]
@@ -236,11 +359,19 @@ mod tests {
             }
         }
 
-        let result = MonteCarlo::run(input, Identity, 42, 256, 2000, 2000, 1e-2).unwrap();
+        let options = MonteCarloOptions {
+            seed: 42,
+            batch_size: 256,
+            min_samples: 2000,
+            max_samples: 4000,
+            rel_tol: 1e-2,
+        };
+
+        let result = MonteCarlo::run(input, Identity, SamplingMethod::Gaussian, options).unwrap();
 
         // expectation of identity should match input mean
-        approx::assert_abs_diff_eq!(result.mean[0], 1.0, epsilon = 1e-1);
-        approx::assert_abs_diff_eq!(result.mean[1], 2.0, epsilon = 1e-1);
+        approx::assert_abs_diff_eq!(result.statistics.mean[0], 1.0, epsilon = 1e-1);
+        approx::assert_abs_diff_eq!(result.statistics.mean[1], 2.0, epsilon = 1e-1);
     }
 
     #[test]
@@ -270,14 +401,21 @@ mod tests {
             }
         }
 
-        let result = MonteCarlo::run(input, Identity, 7, 500, 100000, 200000, 1e-5).unwrap();
+        let options = MonteCarloOptions {
+            seed: 7,
+            batch_size: 256,
+            min_samples: 100_000,
+            max_samples: 200_000,
+            rel_tol: 1e-5,
+        };
 
-        dbg!(&result.covariance);
+        let result = MonteCarlo::run(input, Identity, SamplingMethod::Gaussian, options).unwrap();
+
         // off-diagonals should be ~0
         for i in 0..3 {
             for j in 0..3 {
                 if i != j {
-                    assert!(result.covariance[[i, j]].abs() < 1e-1);
+                    assert!(result.statistics.covariance[[i, j]].abs() < 1e-1);
                 }
             }
         }

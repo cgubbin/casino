@@ -1,5 +1,61 @@
-use ndarray::{Array, Array1, Array2, ArrayView1, ArrayView2, Dimension, Ix1, Ix2};
-use num_traits::Zero;
+/// The [`Operator`] trait is implemented by callers. The operator transforms a set of input values
+/// to a set of output values:
+///
+/// ```
+/// use casino::*;
+/// use ndarray::{arr1, ArrayView1, Ix1};
+///
+/// struct Identity;
+///
+/// impl Operator<f64> for Identity {
+///     fn dim_in(&self) -> usize { 2 }
+///     fn dim_out(&self) -> usize { 2 }
+///
+///     fn apply(
+///         &self,
+///         x: ArrayView1<'_, f64>,
+///     ) -> Result<EvalResult<f64, Ix1>, OperatorError> {
+///
+///         EvalResult::try_from_parts(
+///             x.to_owned(),
+///             arr1(&[true, true]),
+///         )
+///     }
+/// }
+/// ```
+///
+/// Fallible operators should return `false` for failed evaluations rather than panicking:
+/// ```
+/// use casino::*;
+/// use ndarray::{arr1, ArrayView1, Ix1};
+///
+/// struct Reciprocal;
+///
+/// impl Operator<f64> for Reciprocal {
+///     fn dim_in(&self) -> usize { 1 }
+///     fn dim_out(&self) -> usize { 1 }
+///
+///     fn apply(
+///         &self,
+///         x: ArrayView1<'_, f64>,
+///     ) -> Result<EvalResult<f64, Ix1>, OperatorError> {
+///
+///         if x[0] == 0.0 {
+///             return EvalResult::try_from_parts(
+///                 arr1(&[0.0]),
+///                 arr1(&[false]),
+///             );
+///         }
+///
+///         EvalResult::try_from_parts(
+///             arr1(&[1.0 / x[0]]),
+///             arr1(&[true]),
+///         )
+///     }
+/// }
+/// ```
+use ndarray::{Array, Array1, Array2, ArrayView1, ArrayView2, Dimension, Ix1, Ix2, Zip};
+use num_traits::{Float, Zero};
 
 #[derive(thiserror::Error, Debug)]
 pub enum OperatorError {
@@ -57,11 +113,38 @@ impl<E, D: Dimension> EvalResult<E, D> {
         (self.value, self.valid)
     }
 
-    pub fn invalidate_where_nan(&mut self) {
-        todo!()
+    pub fn invalidate_where_nan(&mut self)
+    where
+        E: 'static + Float,
+    {
+        let nan_mask = self.value.is_nan();
+
+        // self.valid is true if a value is valid, but the mask is true if it is an nan
+        // so we flip the mask
+        self.valid = !nan_mask & &self.valid;
     }
+
+    pub fn invalidate_where_infinite(&mut self)
+    where
+        E: 'static + Float,
+    {
+        let inf_mask = self.value.is_infinite();
+
+        // self.valid is true if a value is valid, but the mask is true if it is infinite
+        // so we flip the mask
+        self.valid = !inf_mask & &self.valid;
+    }
+
+    pub fn invalidate(&mut self)
+    where
+        E: 'static + Float,
+    {
+        self.invalidate_where_nan();
+        self.invalidate_where_infinite();
+    }
+
     pub fn all_valid(&self) -> bool {
-        todo!()
+        Zip::from(self.valid.view()).all(|&v| v)
     }
 }
 
@@ -210,6 +293,75 @@ mod test {
         let valid = ndarray::Array2::<bool>::from_elem((3, 3), true);
 
         assert!(EvalResult::try_from_parts(value, valid).is_err());
+    }
+
+    #[test]
+    fn eval_result_invalidates_nans() {
+        let value =
+            ndarray::Array2::<f64>::from_shape_vec((2, 2), vec![1., f64::NAN, 3., 4.]).unwrap();
+        let valid = ndarray::Array2::<bool>::from_elem((2, 2), true);
+
+        let res = EvalResult::try_from_parts(value, valid);
+        assert!(res.is_ok());
+
+        let mut res = res.unwrap();
+
+        res.invalidate_where_nan();
+
+        let (v, m) = res.split();
+
+        let expected =
+            ndarray::Array2::<bool>::from_shape_vec((2, 2), vec![true, false, true, true]).unwrap();
+
+        assert_eq!(expected, m);
+    }
+
+    #[test]
+    fn eval_result_invalidates_infinite() {
+        let value = ndarray::Array2::<f64>::from_shape_vec((2, 2), vec![1., f64::INFINITY, 3., 4.])
+            .unwrap();
+        let valid = ndarray::Array2::<bool>::from_elem((2, 2), true);
+
+        let res = EvalResult::try_from_parts(value, valid);
+        assert!(res.is_ok());
+
+        let mut res = res.unwrap();
+
+        res.invalidate_where_infinite();
+
+        let (v, m) = res.split();
+
+        let expected =
+            ndarray::Array2::<bool>::from_shape_vec((2, 2), vec![true, false, true, true]).unwrap();
+
+        assert_eq!(expected, m);
+    }
+
+    #[test]
+    fn all_valid_returns_true_when_all_valid() {
+        let value = ndarray::Array2::<f64>::from_shape_vec((2, 2), vec![1., 2., 3., 4.]).unwrap();
+        let valid = ndarray::Array2::<bool>::from_elem((2, 2), true);
+
+        let res = EvalResult::try_from_parts(value, valid);
+        assert!(res.is_ok());
+
+        let mut res = res.unwrap();
+
+        assert!(res.all_valid());
+    }
+
+    #[test]
+    fn all_valid_returns_false_when_not_all_valid() {
+        let value = ndarray::Array2::<f64>::from_shape_vec((2, 2), vec![1., 2., 3., 4.]).unwrap();
+        let valid =
+            ndarray::Array2::<bool>::from_shape_vec((2, 2), vec![true, false, true, true]).unwrap();
+
+        let res = EvalResult::try_from_parts(value, valid);
+        assert!(res.is_ok());
+
+        let mut res = res.unwrap();
+
+        assert!(!res.all_valid());
     }
 
     #[test]

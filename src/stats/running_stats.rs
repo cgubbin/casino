@@ -1,17 +1,17 @@
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2, Axis, LinalgScalar, ScalarOperand};
 use num_traits::Float;
 
-use super::{SampleBatch, SummaryStatistics};
+use super::{FinalStatistics, SampleBatch, StatisticalDiagnostics, SummaryStatistics};
+use crate::controller::{ConvergenceCriterion, ConvergenceStatus};
 
 #[derive(Clone, Debug)]
 pub struct RunningStats<E> {
-    n: usize,
+    n: usize, // Global batch count
     mean: Array1<E>,
     m2: Array2<E>, // unnormalised covariance accumulator
 
-    // Per-dimension effective sample count
-    pair_count: Array2<usize>,
-    count: Array1<usize>,
+    pair_count: Array2<usize>, // Per-dimension effective sample count
+    count: Array1<usize>,      // Per-dimension valid counts
 }
 
 impl<E> RunningStats<E>
@@ -36,44 +36,6 @@ where
     pub fn mean(&self) -> ArrayView1<'_, E> {
         self.mean.view()
     }
-
-    // pub fn update(&mut self, x: ArrayView1<'_, E>, valid: ArrayView1<'_, bool>)
-    // where
-    //     E: Float + LinalgScalar,
-    // {
-    //     assert_eq!(x.len(), self.mean.len());
-    //     assert_eq!(valid.len(), self.mean.len());
-
-    //     let n_old = self.n;
-    //     self.n += 1;
-
-    //     let n_new = E::from(self.n).unwrap();
-
-    //     for i in 0..x.len() {
-    //         if !valid[i] {
-    //             continue;
-    //         }
-
-    //         self.count[i] += 1;
-
-    //         let delta = x[i] - self.mean[i];
-    //         self.mean[i] = self.mean[i] + delta / n_new;
-
-    //         let delta2 = x[i] - self.mean[i];
-
-    //         // diagonal + off-diagonal contribution still possible via full outer product
-    //         for j in 0..x.len() {
-    //             if !valid[j] {
-    //                 continue;
-    //             }
-
-    //             let d1 = x[i] - self.mean[i];
-    //         let d2 = x[j] - self.mean[j];
-
-    //         self.m2[[i, j]] = self.m2[[i, j]] + d1 * d2;
-    //     }
-    // }
-    // }
 
     pub fn update(&mut self, x: ArrayView1<'_, E>, valid: ArrayView1<'_, bool>)
     where
@@ -137,6 +99,7 @@ where
     where
         E: Float + LinalgScalar + std::fmt::Debug,
     {
+        // TODO: For simplicity uses the correct row-wise implementation, should be vectorised
         for i in 0..x.nrows() {
             self.update(x.row(i), valid.row(i));
         }
@@ -193,15 +156,85 @@ where
         &self.m2 / denom
     }
 
+    pub fn std_dev(&self) -> Array1<E> {
+        self.covariance().diag().mapv(|v| v.sqrt())
+    }
+
+    /// Standard error of the mean per component
+    pub fn mean_standard_error(&self) -> Array1<E> {
+        let cov = self.covariance();
+
+        let n = E::from(self.n).unwrap();
+
+        cov.diag().mapv(|v| (v / n).sqrt())
+    }
+
+    /// Standard error of the standard deviation (delta method)
+    pub fn std_standard_error(&self) -> Array1<E> {
+        let std = self.std_dev();
+
+        let n = E::from(self.n.saturating_sub(1)).unwrap();
+
+        std.mapv(|s| s / (E::from(2.0).unwrap() * n).sqrt())
+    }
+
+    fn valid_fraction(&self) -> Array1<E> {
+        self.count
+            .mapv(|each| E::from(each).unwrap() / E::from(self.n).unwrap())
+    }
+
     /// Final mean
     pub fn finalize_mean(&self) -> Array1<E> {
         self.mean.clone()
     }
 
-    pub fn finalize(&self) -> SummaryStatistics<E> {
-        SummaryStatistics {
+    pub fn finalize(&self) -> FinalStatistics<E> {
+        let summary = SummaryStatistics {
             mean: self.finalize_mean(),
             covariance: self.covariance(),
+        };
+        let diagnostics = StatisticalDiagnostics {
+            mean_standard_error: self.mean_standard_error(),
+            std_standard_error: self.std_standard_error(),
+            valid_fraction: self.valid_fraction(),
+        };
+
+        FinalStatistics {
+            summary,
+            diagnostics,
+        }
+    }
+
+    pub fn check_convergence(&self, criterion: &ConvergenceCriterion<E>) -> ConvergenceStatus<E> {
+        let se = self.mean_standard_error();
+        let mean = &self.mean;
+
+        let mut converged = true;
+
+        match criterion {
+            ConvergenceCriterion::AbsoluteMeanError { tol } => {
+                for i in 0..mean.len() {
+                    if se[i] > *tol {
+                        converged = false;
+                        break;
+                    }
+                }
+            }
+
+            ConvergenceCriterion::RelativeMeanError { rel_tol } => {
+                for i in 0..mean.len() {
+                    let scale = mean[i].abs().max(E::from(1e-12).unwrap());
+                    if se[i] / scale > *rel_tol {
+                        converged = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        ConvergenceStatus {
+            converged,
+            max_se: se,
         }
     }
 }
