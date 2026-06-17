@@ -96,21 +96,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b02b629252fe8ef6460461409564e2c21d0c8e77e0944f3d189ff06c4e932ad"
 
 [[package]]
-name = "casino"
-version = "0.2.0"
-dependencies = [
- "approx 0.5.1",
- "argmin",
- "cargo-husky",
- "ndarray 0.17.2",
- "ndarray-linalg 0.18.1",
- "ndarray-rand",
- "num-traits",
- "thiserror 2.0.18",
- "tracing",
-]
-
-[[package]]
 name = "cauchy"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -374,6 +359,21 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "montecore"
+version = "0.1.0"
+dependencies = [
+ "approx 0.5.1",
+ "argmin",
+ "cargo-husky",
+ "ndarray 0.17.2",
+ "ndarray-linalg 0.18.1",
+ "ndarray-rand",
+ "num-traits",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

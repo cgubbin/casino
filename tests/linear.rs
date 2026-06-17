@@ -1,6 +1,6 @@
 use approx::assert_abs_diff_eq;
 
-use montecore::{EvalResult, InputSpec, MonteCarlo, Operator, OperatorError};
+use montecore::{EvalResult, Operator, OperatorError};
 
 use ndarray::{Array1, Array2, ArrayView1};
 

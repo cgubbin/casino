@@ -1,4 +1,3 @@
-mod convergence;
 mod running_stats;
 mod sample_batch;
 mod summary;

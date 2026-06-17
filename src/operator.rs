@@ -308,7 +308,7 @@ mod test {
 
         res.invalidate_where_nan();
 
-        let (v, m) = res.split();
+        let (_, m) = res.split();
 
         let expected =
             ndarray::Array2::<bool>::from_shape_vec((2, 2), vec![true, false, true, true]).unwrap();
@@ -329,7 +329,7 @@ mod test {
 
         res.invalidate_where_infinite();
 
-        let (v, m) = res.split();
+        let (_, m) = res.split();
 
         let expected =
             ndarray::Array2::<bool>::from_shape_vec((2, 2), vec![true, false, true, true]).unwrap();
@@ -345,7 +345,7 @@ mod test {
         let res = EvalResult::try_from_parts(value, valid);
         assert!(res.is_ok());
 
-        let mut res = res.unwrap();
+        let res = res.unwrap();
 
         assert!(res.all_valid());
     }
@@ -359,7 +359,7 @@ mod test {
         let res = EvalResult::try_from_parts(value, valid);
         assert!(res.is_ok());
 
-        let mut res = res.unwrap();
+        let res = res.unwrap();
 
         assert!(!res.all_valid());
     }
