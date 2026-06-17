@@ -9,7 +9,6 @@ Casino provides:
 * Adaptive convergence control
 * Correlated and independent input models
 * Streaming statistics (mean, variance, covariance)
-* Validity-aware model evaluation
 * Deterministic and reproducible execution
 * Batch-oriented execution suitable for future parallelisation
 
@@ -159,7 +158,7 @@ Use when:
 Sampling::LatinHypercube
 ```
 
-Stratified sampling method that typically converges faster than standard Monte Carlo.
+Stratified sampling method
 
 Use when:
 
@@ -218,7 +217,7 @@ EvalResult::try_from_parts(
 where:
 
 ```text
-valid[i] == TRUE
+valid[i] == true
 ```
 
 means the output is statistically valid.
@@ -226,7 +225,7 @@ means the output is statistically valid.
 and
 
 ```text
-valid[i] == FALSE
+valid[i] == false
 ```
 
 means the output should be excluded from all downstream statistics.
@@ -358,52 +357,3 @@ Memory usage scales with output dimension rather than sample count.
 
 ---
 
-# Design Principles
-
-Casino intentionally separates:
-
-```text
-InputSpec
-```
-
-describes uncertainty.
-
-```text
-Sampling
-```
-
-describes exploration of uncertainty.
-
-```text
-Operator
-```
-
-describes the physical model.
-
-```text
-SummaryStatistics
-```
-
-describes the resulting uncertainty.
-
-This separation makes sampling methods interchangeable and allows future extensions without modifying user models.
-
----
-
-# Roadmap
-
-Planned features include:
-
-* Parallel batch execution
-* Importance sampling
-* Polynomial chaos expansion
-* Sensitivity analysis
-* GPU acceleration
-* Custom probability distributions
-* Multi-fidelity Monte Carlo
-
----
-
-# License
-
-MIT OR Apache-2.0
