@@ -54,6 +54,8 @@
 
           cargo-nextest
           cargo-tarpaulin
+          cargo-readme
+          release-plz
           cargo-watch
           bacon
           just

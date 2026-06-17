@@ -1,6 +1,6 @@
 use approx::assert_abs_diff_eq;
 
-use casino::{EvalResult, InputSpec, MonteCarlo, Operator, OperatorError};
+use montecore::{EvalResult, InputSpec, MonteCarlo, Operator, OperatorError};
 
 use ndarray::{Array1, Array2, ArrayView1};
 
@@ -70,7 +70,7 @@ impl Operator<f64> for LinearOperator {
 
 #[test]
 fn gaussian_linear_covariance_matches_analytic() {
-    use casino::*;
+    use montecore::*;
     use ndarray::{arr1, arr2};
 
     let problem = LinearProblem {

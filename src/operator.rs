@@ -2,7 +2,7 @@
 /// to a set of output values:
 ///
 /// ```
-/// use casino::*;
+/// use montecore::*;
 /// use ndarray::{arr1, ArrayView1, Ix1};
 ///
 /// struct Identity;
@@ -26,7 +26,7 @@
 ///
 /// Fallible operators should return `false` for failed evaluations rather than panicking:
 /// ```
-/// use casino::*;
+/// use montecore::*;
 /// use ndarray::{arr1, ArrayView1, Ix1};
 ///
 /// struct Reciprocal;

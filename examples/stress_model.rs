@@ -1,4 +1,4 @@
-use casino::*;
+use montecore::*;
 use ndarray::arr2;
 
 struct StressModel;
@@ -25,7 +25,7 @@ impl Operator<f64> for StressModel {
     }
 }
 
-fn main() -> Result<(), CasinoError> {
+fn main() -> Result<(), MontecoreError> {
     let covariance = arr2(&[[1.0, 0.8], [0.8, 1.0]]);
     let means = ndarray::arr1(&[10.0, 10.0]);
 

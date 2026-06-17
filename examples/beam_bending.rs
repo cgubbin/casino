@@ -1,4 +1,4 @@
-use casino::*;
+use montecore::*;
 use ndarray::{arr1, ArrayView1};
 
 struct BeamBending;
@@ -29,7 +29,7 @@ impl Operator<f64> for BeamBending {
     }
 }
 
-fn main() -> Result<(), CasinoError> {
+fn main() -> Result<(), MontecoreError> {
     let means = arr1(&[100.0, 10.0]);
     let marginal_scale = arr1(&[10.0, 2.0]);
 

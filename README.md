@@ -1,8 +1,10 @@
-# Casino
+# montecore
+
+## Montecore
 
 A Rust library for uncertainty propagation using Monte Carlo simulation.
 
-Casino provides:
+Montecore provides:
 
 * Gaussian Monte Carlo sampling
 * Latin Hypercube Sampling (LHS)
@@ -14,9 +16,9 @@ Casino provides:
 
 ---
 
-# Philosophy
+## Philosophy
 
-Casino is designed for scientific and engineering uncertainty analysis.
+Montecore is designed for scientific and engineering uncertainty analysis.
 
 The library separates uncertainty propagation into three independent concepts:
 
@@ -28,19 +30,19 @@ This separation allows the same operator to be evaluated using different samplin
 
 ---
 
-# Installation
+## Installation
 
 ```toml
 [dependencies]
-casino = "0.2"
+montecore = "0.2"
 ```
 
 ---
 
-# Quick Start
+## Quick Start
 
 ```rust
-use casino::*;
+use montecore::*;
 use ndarray::{arr1, ArrayView1, Ix1};
 
 struct BeamDeflection;
@@ -79,8 +81,8 @@ let result = MonteCarlo::run(
         means: means.view(),
         marginal_scale: stddev.view(),
     },
-    Sampling::Gaussian,
     BeamDeflection,
+    SamplingMethod::Gaussian,
     MonteCarloOptions {
         seed: 42,
         batch_size: 1024,
@@ -88,7 +90,7 @@ let result = MonteCarlo::run(
         max_samples: 1_000_000,
         rel_tol: 1e-3,
     },
-)?;
+);
 ```
 
 The returned result contains estimated output statistics:
@@ -100,24 +102,24 @@ result.statistics.covariance
 
 ---
 
-# Input Models
+## Input Models
 
-Casino supports both independent and correlated inputs.
+Montecore supports both independent and correlated inputs.
 
-## Independent Inputs
+### Independent Inputs
 
 ```rust
 InputSpec::Independent {
     means: means.view(),
     marginal_scale: marginal_scale.view(),
-}
+};
 ```
 
 Each variable is sampled independently.
 
 ---
 
-## Correlated Inputs
+### Correlated Inputs
 
 ```rust
 InputSpec::Correlated {
@@ -128,18 +130,18 @@ InputSpec::Correlated {
 
 The covariance matrix describes correlations between inputs.
 
-For Gaussian sampling, Casino computes a Cholesky factorisation internally and generates correlated samples automatically.
+For Gaussian sampling, Montecore computes a Cholesky factorisation internally and generates correlated samples automatically.
 
 ---
 
-# Sampling Methods
+## Sampling Methods
 
 Sampling strategy determines how the input space is explored.
 
-## Gaussian Sampling
+### Gaussian Sampling
 
 ```rust
-Sampling::Gaussian
+SamplingMethod::Gaussian
 ```
 
 Traditional Monte Carlo sampling using independent Gaussian random variables.
@@ -152,10 +154,10 @@ Use when:
 
 ---
 
-## Latin Hypercube Sampling
+### Latin Hypercube Sampling
 
 ```rust
-Sampling::LatinHypercube
+SamplingMethod::LatinHypercube
 ```
 
 Stratified sampling method
@@ -168,7 +170,7 @@ Use when:
 
 ---
 
-# Choosing a Sampling Method
+## Choosing a Sampling Method
 
 | Method          | Characteristics                         |
 | --------------- | --------------------------------------- |
@@ -178,14 +180,14 @@ Use when:
 For most engineering uncertainty propagation problems:
 
 ```rust
-Sampling::LatinHypercube
+SamplingMethod::LatinHypercube
 ```
 
 is a good default.
 
 ---
 
-# The Operator Trait
+## The Operator Trait
 
 User code implements the measurement model through the `Operator` trait.
 
@@ -201,9 +203,9 @@ pub trait Operator<E> {
 
 ---
 
-# Validity Masks
+## Validity Masks
 
-Casino uses validity masks rather than exceptions to handle numerical failures.
+Montecore uses validity masks rather than exceptions to handle numerical failures.
 
 Each output value has a corresponding validity flag.
 
@@ -216,7 +218,7 @@ EvalResult::try_from_parts(
 
 where:
 
-```text
+```
 valid[i] == true
 ```
 
@@ -224,7 +226,7 @@ means the output is statistically valid.
 
 and
 
-```text
+```
 valid[i] == false
 ```
 
@@ -232,9 +234,12 @@ means the output should be excluded from all downstream statistics.
 
 ---
 
-## Example
+### Example
 
 ```rust
+use montecore::*;
+use ndarray::{ArrayView1, Ix1, arr1};
+
 struct Reciprocal;
 
 impl Operator<f64> for Reciprocal {
@@ -260,25 +265,25 @@ This allows Monte Carlo simulations to continue even when individual evaluations
 
 ---
 
-# Adaptive Convergence
+## Adaptive Convergence
 
-Casino automatically monitors convergence during simulation.
+Montecore automatically monitors convergence during simulation.
 
 The engine terminates when either:
 
-```text
+```
 maximum relative uncertainty < rel_tol
 ```
 
 or
 
-```text
+```
 sample count >= max_samples
 ```
 
 while also enforcing:
 
-```text
+```
 sample count >= min_samples
 ```
 
@@ -288,7 +293,7 @@ This allows simulations to stop early once sufficient statistical precision has 
 
 ---
 
-# Reproducibility
+## Reproducibility
 
 All sampling methods are deterministic.
 
@@ -310,9 +315,9 @@ will always produce identical results.
 
 ---
 
-# Statistics
+## Statistics
 
-Casino computes statistics incrementally using streaming estimators.
+Montecore computes statistics incrementally using streaming estimators.
 
 The following quantities are available:
 
@@ -325,13 +330,13 @@ SummaryStatistics {
 
 where:
 
-```text
+```
 expectation
 ```
 
 is the estimated mean output vector and
 
-```text
+```
 covariance
 ```
 
@@ -341,9 +346,9 @@ Streaming accumulation avoids storing all Monte Carlo samples in memory.
 
 ---
 
-# Numerical Robustness
+## Numerical Robustness
 
-Casino uses:
+Montecore uses:
 
 * Welford-style online moment accumulation
 * Chan-style batch merging
@@ -357,3 +362,4 @@ Memory usage scales with output dimension rather than sample count.
 
 ---
 
+License: MIT
