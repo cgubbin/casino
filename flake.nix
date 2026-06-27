@@ -2,7 +2,7 @@
   description = "Rust template with binary, library, Fenix, and Crane";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
     fenix = {
       url = "github:nix-community/fenix";
@@ -11,7 +11,6 @@
 
     crane = {
       url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -31,13 +30,10 @@
         inherit system overlays;
       };
 
-      rustToolchain = pkgs.fenix.stable.withComponents [
-        "cargo"
-        "clippy"
-        "rust-src"
-        "rustc"
-        "rustfmt"
-      ];
+      rustToolchain = pkgs.fenix.fromToolchainFile {
+        file = ./rust-toolchain.toml;
+        sha256 = "mvUGEOHYJpn3ikC5hckneuGixaC+yGrkMM/liDIDgoU=";
+      };
 
       craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
       src = craneLib.cleanCargoSource ./.;
@@ -50,14 +46,16 @@
       default = pkgs.mkShell {
         packages = with pkgs; [
           rustToolchain
-          fenix.packages.${system}.rust-analyzer
 
           cargo-nextest
-          cargo-tarpaulin
+          cargo-edit
           cargo-readme
+          cargo-release
           release-plz
           cargo-watch
-          bacon
+          git-cliff
+          cargo-deny
+          cargo-semver-checks
           just
 
           pkg-config
@@ -89,13 +87,10 @@
         inherit system overlays;
       };
 
-      rustToolchain = pkgs.fenix.stable.withComponents [
-        "cargo"
-        "clippy"
-        "rust-src"
-        "rustc"
-        "rustfmt"
-      ];
+      rustToolchain = pkgs.fenix.fromToolchainFile {
+        file = ./rust-toolchain.toml;
+        sha256 = "mvUGEOHYJpn3ikC5hckneuGixaC+yGrkMM/liDIDgoU=";
+      };
 
       craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
       src = craneLib.cleanCargoSource ./.;
@@ -119,13 +114,10 @@
         inherit system overlays;
       };
 
-      rustToolchain = pkgs.fenix.stable.withComponents [
-        "cargo"
-        "clippy"
-        "rust-src"
-        "rustc"
-        "rustfmt"
-      ];
+      rustToolchain = pkgs.fenix.fromToolchainFile {
+        file = ./rust-toolchain.toml;
+        sha256 = "mvUGEOHYJpn3ikC5hckneuGixaC+yGrkMM/liDIDgoU=";
+      };
 
       craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
       src = craneLib.cleanCargoSource ./.;
